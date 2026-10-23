@@ -163,9 +163,12 @@ constexpr std::uint32_t JobDispatcher_DispatchParallelJob = 4117243690UL;
 #pragma endregion
 
 #pragma region JobHandle
-constexpr std::uint32_t JobHandle_ctor = 0x6EFF1BD2;
 constexpr std::uint32_t JobHandle_dtor = 0x9E480A2E;
 constexpr std::uint32_t JobHandle_Join = 0x9C9C097C;
+#pragma endregion
+
+#pragma region JobInternalHandle
+constexpr std::uint32_t JobInternalHandle_Acquire = 0x6EFF1BD2;
 #pragma endregion
 
 #pragma region JobQueue
@@ -190,6 +193,22 @@ constexpr std::uint32_t Memory_PoolScript_vtbl = 0x600407D7;
 
 #pragma region OpcodeHandlers
 constexpr std::uint32_t OpcodeHandlers = 0x39532858;
+#pragma endregion
+
+#pragma region ObjectPackageExtractor
+constexpr std::uint32_t ObjectPackageExtractor_Initialize = 2318998714;
+constexpr std::uint32_t ObjectPackageExtractor_ExtractSync = 2038372664;
+constexpr std::uint32_t ObjectPackageExtractor_ExtractAsync = 3819248393;
+#pragma endregion
+
+#pragma region ObjectPackageReader
+constexpr std::uint32_t ObjectPackageReader_ctor = 3628731410;
+constexpr std::uint32_t ObjectPackageReader_OnReadHeader = 1632836642;
+constexpr std::uint32_t ObjectPackageReader_ReadHeader = 1285757088;
+#pragma endregion
+
+#pragma region BasePackageReader
+constexpr std::uint32_t BasePackageReader_ReadHeader = 3410956665;
 #pragma endregion
 
 #pragma region ResourceDepot

@@ -61,5 +61,6 @@ RED4EXT_ASSERT_SIZE(EntityTemplate, 0x2B0);
 } // namespace ent
 using entEntityTemplate = ent::EntityTemplate;
 } // namespace RED4ext
+*/
 
 // clang-format on
