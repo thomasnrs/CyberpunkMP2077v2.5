@@ -116,13 +116,24 @@ bool ValidateType(Set<RED4ext::CName>& knownTypes, Game::ScriptType* type, Game:
 
 bool ValidateFunction(Game::ScriptClass* klass, Game::ScriptFunction* func, Game::ScriptReport* apReporter)
 {
-    if (!func->flags.isNative)
+    // The virtual, not the flags field: ScriptFunction's flags moved on 2.5, and the game's own
+    // validator asks the same way (vtable+0x30 in its native class check at 0x6BEB2A).
+    if (!func->IsNative())
         return false;
 
     Set<RED4ext::CName> knownTypes;
 
     for (const auto param : func->params)
     {
+        // ScriptParameter is only known to have moved with the grown base (+0x28). Its back
+        // pointer confirms that before type and flags are read off it.
+        if (param->function != func)
+        {
+            spdlog::error("[Rpc] {}.{}: ScriptParameter::function does not match - parameter layout moved",
+                          klass->name.ToString(), func->name.ToString());
+            return false;
+        }
+
         if (param->flags.isOut || param->flags.isOptional)
         {
             auto res = std::format(
