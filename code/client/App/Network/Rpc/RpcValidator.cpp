@@ -146,7 +146,12 @@ bool ValidateFunction(Game::ScriptClass* klass, Game::ScriptFunction* func, Game
 bool (*RealScriptValidator_Validate)(void* apThis, Game::ScriptBundle* apBundler, Game::ScriptReport* apReporter);
 bool HookScriptValidator_Validate(void* apThis, Game::ScriptBundle* apBundler, Game::ScriptReport* apReporter)
 {
-    apReporter->fillErrors = true;
+    // ScriptReport is unconfirmed on 2.5. Only flip the flag if the byte still looks like a
+    // bool; writing into the low byte of a pointer would corrupt it silently.
+    if (const auto current = *reinterpret_cast<const uint8_t*>(&apReporter->fillErrors); current <= 1)
+        apReporter->fillErrors = true;
+    else
+        spdlog::warn("[Rpc] ScriptReport+0x8 holds {}, not a bool - leaving it alone", current);
 
     constexpr Red::CName parentName("CyberpunkMP.ServerRpc");
     for (const auto klass : apBundler->classes)
@@ -166,6 +171,17 @@ bool HookScriptValidator_Validate(void* apThis, Game::ScriptBundle* apBundler, G
 
                 for (const auto func : klass->functions)
                 {
+                    // ScriptFunction's 2.5 layout is only confirmed up to params; a function
+                    // that does not point back at its class means the offsets are wrong, and
+                    // reading flags or params off it would read garbage.
+                    if (func->parent != klass)
+                    {
+                        spdlog::error("[Rpc] {}: ScriptFunction::parent does not match its class - "
+                                      "ScriptFunction layout moved, RPCs for this class are skipped",
+                                      name);
+                        break;
+                    }
+
                     if (!ValidateFunction(klass, func, apReporter))
                         continue;
 

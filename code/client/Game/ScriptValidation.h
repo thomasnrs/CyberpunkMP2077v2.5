@@ -36,6 +36,10 @@ struct ScriptDefinition
 
     Red::CName name; // 08
     uint64_t unk10;  // 10
+    // Patch 2.5: every script definition grew by 0x28 after the name, so every field of the
+    // derived structs below sits 0x28 later than its comment (which are 2.31 offsets).
+    // Derived from the game's ScriptValidator by Codeware's 2.5 port (psiberx/cp2077-codeware#63).
+    uint8_t unk18[0x28]; // 18
 };
 
 enum class EScriptType : uint8_t
@@ -75,7 +79,7 @@ struct ScriptProperty : ScriptDefinition
     Red::CProperty* rttiProp;                          // 18
     ScriptDefinition* parent;                          // 20
     Flags flags;                                       // 28
-    Map<Red::CString, Red::CString> defaults;          // 30
+    Red::Map<Red::CString, Red::CString> defaults;     // 30 - the engine's Map; bare Map is the mod's hopscotch_map
     EScriptVisibility visibility;                      // 58
     Red::HashMap<Red::CName, Red::CString> attributes; // 60
     ScriptType* type;                                  // 90
@@ -157,7 +161,11 @@ struct ScriptFunction : ScriptDefinition
     ScriptFileInfo* sourceFile;                        // C0
     uint32_t sourceLine;                               // C8
 };
-RED4EXT_ASSERT_SIZE(ScriptFunction, 0xD0);
+// Patch 2.5: only the grown base is confirmed for ScriptFunction (parent, shortName and params
+// sit right after it). The fields past params, flags included, are assumed to have moved with
+// the base alone; HookScriptValidator_Validate checks parent before trusting the rest.
+static_assert(offsetof(ScriptFunction, parent) == 0x48);
+static_assert(offsetof(ScriptFunction, params) == 0x58);
 
 struct ScriptClass : ScriptDefinition
 {
@@ -174,32 +182,41 @@ struct ScriptClass : ScriptDefinition
     ScriptClass* parent;                               // 20
     Red::DynArray<ScriptProperty*> properties;         // 28
     Red::DynArray<ScriptProperty*> overrides;          // 38
+    uint8_t unk70[0x20];                               // patch 2.5: new bytes before functions
     Red::DynArray<ScriptFunction*> functions;          // 48
     Red::HashMap<Red::CName, Red::CString> attributes; // 58
     EScriptVisibility visibility;                      // 88
     Flags flags;                                       // 89
 };
+// Patch 2.5 offsets, read by the game's ScriptValidator class check.
+static_assert(offsetof(ScriptClass, parent) == 0x48);
+static_assert(offsetof(ScriptClass, properties) == 0x50);
+static_assert(offsetof(ScriptClass, functions) == 0x90);
+static_assert(offsetof(ScriptClass, flags) == 0xD1);
+static_assert(offsetof(ScriptProperty, type) == 0xB8);
+static_assert(offsetof(ScriptType, innerType) == 0x48);
+static_assert(offsetof(ScriptType, metaType) == 0x54);
 
 struct ScriptBundle
 {
     ScriptBundle();
     ~ScriptBundle();
 
-    Red::HashMap<Red::CName, ScriptDefinition*> definitionsByName; // 00
-    Red::HashMap<Red::CName, ScriptFunction*> functionsByName;     // 30
-    Red::HashMap<Red::CName, ScriptType*> typesByName;             // 60
-    Red::DynArray<ScriptFileInfo*> files;                          // 90
-    Red::DynArray<ScriptFunction*> globals;                        // A0
-    Red::DynArray<void*> enums;                                    // B0
-    Red::DynArray<void*> bitfields;                                // C0
-    Red::DynArray<ScriptClass*> classes;                           // D0
-    Red::DynArray<ScriptType*> types;                              // E0
-    Red::DynArray<Red::CString> strings;                           // F0
-    Red::HashMap<Red::CName, void*> unk100;                        // 100
-    Red::SharedSpinLock typesLock;                                 // 130
-    CRITICAL_SECTION unk138;                                       // 138
+    // Patch 2.5 added 8 bytes at the start; the tail past strings changed too and is left
+    // opaque - nothing here reads it, and the game owns every instance.
+    void* unk00;                                                   // 00
+    Red::HashMap<Red::CName, ScriptDefinition*> definitionsByName; // 08
+    Red::HashMap<Red::CName, ScriptFunction*> functionsByName;     // 38
+    Red::HashMap<Red::CName, ScriptType*> typesByName;             // 68
+    Red::DynArray<ScriptFileInfo*> files;                          // 98
+    Red::DynArray<ScriptFunction*> globals;                        // A8
+    Red::DynArray<void*> enums;                                    // B8
+    Red::DynArray<void*> bitfields;                                // C8
+    Red::DynArray<ScriptClass*> classes;                           // D8
+    Red::DynArray<ScriptType*> types;                              // E8
+    Red::DynArray<Red::CString> strings;                           // F8
 };
-RED4EXT_ASSERT_SIZE(ScriptBundle, 0x160);
+static_assert(offsetof(ScriptBundle, classes) == 0xD8);
 
 struct StringView
 {

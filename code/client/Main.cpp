@@ -38,6 +38,7 @@ void Initialize()
 }
 
 #include "App/Application.h"
+#include "App/World/NetworkWorldSystem.h"
 
 // The game version this build has actually been tested against. Bump when the mod
 // is verified on a newer patch.
@@ -76,6 +77,10 @@ RED4EXT_C_EXPORT bool Main(RED4ext::v1::PluginHandle aHandle, RED4ext::v1::EMain
 
         App::GApplication = MakeUnique<App::Application>(aHandle, aSdk);
         App::GApplication->Bootstrap();
+
+        // As soon as the logger is up, so a crash during script load or the first rendered
+        // frames is logged instead of leaving no trace.
+        InstallCrashLogger();
 
         const auto scriptPath = GCyberpunkMpLocation / TP_REDSCRIPT_LOCATION;
 

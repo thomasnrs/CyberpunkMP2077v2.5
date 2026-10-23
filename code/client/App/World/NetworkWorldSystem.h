@@ -903,6 +903,9 @@ private:
     Red::Handle<VehicleSystem> m_vehicleSystem;
 };
 
+// Vectored exception logger, terminate and SIGABRT handlers. Idempotent.
+void InstallCrashLogger();
+
 RTTI_DEFINE_CLASS(NetworkWorldSystem, { 
     RTTI_ALIAS("CyberpunkMP.World.NetworkWorldSystem");
     RTTI_METHOD(Connect);

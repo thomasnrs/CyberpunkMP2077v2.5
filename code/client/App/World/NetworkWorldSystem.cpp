@@ -3364,30 +3364,10 @@ void NetworkWorldSystem::UpdatePlayerLocation() const
     // }
 }
 
-void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
+// Installed from Main on plugin load as well as from OnInitialize: a crash between the two
+// (script load, the first rendered frames) otherwise leaves no trace at all.
+void InstallCrashLogger()
 {
-    spdlog::info("[OnInitialize]");
-
-    IGameSystem::OnInitialize(aJob);
-
-    if (Settings::IsDisabled())
-        return;
-
-    // Our own crash reporter, because the game's has stopped producing one.
-    //
-    // Every termination since the instrumented flecs build went in has written NO minidump,
-    // NO CrashInfo.json entry and NO Windows error record - while every crash before it
-    // wrote all three. Clearing the report queue (it was at 160 reports and 4.5GB) did not
-    // bring them back, so it is not a storage cap. Whatever is killing the process is not
-    // reaching the game's own handler, and without a dump there is nothing to read.
-    //
-    // A vectored handler sees the exception before any of that and needs nobody's
-    // cooperation. It only reports: it returns EXCEPTION_CONTINUE_SEARCH so the normal
-    // handling still runs, and it swallows nothing.
-    //
-    // Filtered hard on purpose. A vectored handler fires for EVERY exception in the
-    // process, including the C++ and debugger ones the game raises as a matter of course,
-    // and logging those would bury the one line that matters.
     static std::once_flag s_crashHandlerOnce;
     std::call_once(s_crashHandlerOnce,
                    []()
@@ -3527,6 +3507,31 @@ void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
                                    spdlog::error("[Crash]   in {}+0x{:X}", path, rva);
                                }
 
+                               // The callers too: the faulting address alone says where the bad
+                               // read happened, not which code handed it the bad pointer.
+                               void* frames[24]{};
+                               const auto captured = RtlCaptureStackBackTrace(0, 24, frames, nullptr);
+                               for (USHORT frame = 0; frame < captured; ++frame)
+                               {
+                                   HMODULE frameModule{};
+                                   if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS |
+                                                              GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+                                                          static_cast<LPCSTR>(frames[frame]), &frameModule) &&
+                                       frameModule)
+                                   {
+                                       char path[MAX_PATH]{};
+                                       GetModuleFileNameA(frameModule, path, MAX_PATH);
+                                       spdlog::error("[Crash]   frame {}: {}+0x{:X}", frame, path,
+                                                     reinterpret_cast<uint64_t>(frames[frame]) -
+                                                         reinterpret_cast<uint64_t>(frameModule));
+                                   }
+                                   else
+                                   {
+                                       spdlog::error("[Crash]   frame {}: 0x{:016X} (no module)", frame,
+                                                     reinterpret_cast<uint64_t>(frames[frame]));
+                                   }
+                               }
+
                                spdlog::default_logger()->flush();
 
                                // Report only. Let the game handle it as it normally would.
@@ -3629,6 +3634,33 @@ void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
 
                        spdlog::info("[Crash] vectored handler + terminate/abort hooks installed");
                    });
+}
+
+void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
+{
+    spdlog::info("[OnInitialize]");
+
+    IGameSystem::OnInitialize(aJob);
+
+    if (Settings::IsDisabled())
+        return;
+
+    // Our own crash reporter, because the game's has stopped producing one.
+    //
+    // Every termination since the instrumented flecs build went in has written NO minidump,
+    // NO CrashInfo.json entry and NO Windows error record - while every crash before it
+    // wrote all three. Clearing the report queue (it was at 160 reports and 4.5GB) did not
+    // bring them back, so it is not a storage cap. Whatever is killing the process is not
+    // reaching the game's own handler, and without a dump there is nothing to read.
+    //
+    // A vectored handler sees the exception before any of that and needs nobody's
+    // cooperation. It only reports: it returns EXCEPTION_CONTINUE_SEARCH so the normal
+    // handling still runs, and it swallows nothing.
+    //
+    // Filtered hard on purpose. A vectored handler fires for EVERY exception in the
+    // process, including the C++ and debugger ones the game raises as a matter of course,
+    // and logging those would bury the one line that matters.
+    InstallCrashLogger();
 
     // Let flecs speak. Nothing was listening, which is why the crashes are silent.
     //
