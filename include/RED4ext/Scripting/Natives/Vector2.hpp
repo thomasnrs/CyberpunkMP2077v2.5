@@ -1,6 +1,7 @@
 #pragma once
 
 #include <RED4ext/Common.hpp>
+
 #include <cstdint>
 
 namespace RED4ext
@@ -48,7 +49,7 @@ struct Vector2
         return {X - aOther.X, Y - aOther.Y};
     }
 
-    inline Vector2 operator*(const float aScalar) const
+    inline Vector2 operator*(float aScalar) const
     {
         return {X * aScalar, Y * aScalar};
     }

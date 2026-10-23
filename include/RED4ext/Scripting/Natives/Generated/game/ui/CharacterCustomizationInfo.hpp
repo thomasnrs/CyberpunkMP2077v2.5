@@ -7,10 +7,11 @@
 #include <cstdint>
 #include <RED4ext/Common.hpp>
 #include <RED4ext/CName.hpp>
-#include <RED4ext/DynArray.hpp>
+#include <RED4ext/Containers/DynArray.hpp>
 #include <RED4ext/NativeTypes.hpp>
 #include <RED4ext/Scripting/IScriptable.hpp>
 #include <RED4ext/Scripting/Natives/Generated/CensorshipFlags.hpp>
+#include <RED4ext/Scripting/Natives/Generated/game/data/CharacterRandomizationCategory.hpp>
 #include <RED4ext/Scripting/Natives/Generated/game/ui/CharacterCustomizationAction.hpp>
 #include <RED4ext/Scripting/Natives/Generated/game/ui/CharacterCustomizationActionType.hpp>
 #include <RED4ext/Scripting/Natives/Generated/game/ui/CharacterCustomizationEditTag.hpp>
@@ -39,8 +40,10 @@ struct CharacterCustomizationInfo : IScriptable
     CensorshipFlags censorFlag; // A0
     game::ui::CharacterCustomizationActionType censorFlagAction; // A4
     DynArray<game::ui::CharacterCustomizationAction> onDeactivateActions; // A8
+    game::data::CharacterRandomizationCategory randomizeCategory; // B8
+    uint8_t unkBC[0xC0 - 0xBC]; // BC
 };
-RED4EXT_ASSERT_SIZE(CharacterCustomizationInfo, 0xB8);
+RED4EXT_ASSERT_SIZE(CharacterCustomizationInfo, 0xC0);
 } // namespace game::ui
 using gameuiCharacterCustomizationInfo = game::ui::CharacterCustomizationInfo;
 } // namespace RED4ext

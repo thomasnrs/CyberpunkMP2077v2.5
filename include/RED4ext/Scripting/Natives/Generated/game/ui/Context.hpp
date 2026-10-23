@@ -7,7 +7,7 @@
 #include <cstdint>
 namespace RED4ext
 {
-namespace game::ui { 
+namespace game::ui {
 struct Context
 {
     uint32_t Default : 1; // 0
@@ -21,9 +21,9 @@ struct Context
     uint32_t RadialWheel : 1; // 8
     uint32_t VehicleRace : 1; // 9
     uint32_t Berserk : 1; // 10
-    uint32_t b11 : 1; // 11
-    uint32_t b12 : 1; // 12
-    uint32_t b13 : 1; // 13
+    uint32_t CinematicCamera : 1; // 11
+    uint32_t Empty : 1; // 12
+    uint32_t DelamainTaxi : 1; // 13
     uint32_t b14 : 1; // 14
     uint32_t b15 : 1; // 15
     uint32_t b16 : 1; // 16

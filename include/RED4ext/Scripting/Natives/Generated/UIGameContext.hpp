@@ -7,7 +7,7 @@
 #include <cstdint>
 namespace RED4ext
 {
-enum class UIGameContext : uint32_t
+enum class UIGameContext : int32_t
 {
     Default = 0,
     QuickHack = 1,
@@ -20,6 +20,9 @@ enum class UIGameContext : uint32_t
     RadialWheel = 8,
     VehicleRace = 9,
     Berserk = 10,
+    CinematicCamera = 11,
+    Empty = 12,
+    DelamainTaxi = 13,
 };
 } // namespace RED4ext
 

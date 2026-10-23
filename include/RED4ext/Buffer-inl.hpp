@@ -4,6 +4,38 @@
 #include <RED4ext/Buffer.hpp>
 #endif
 
+RED4EXT_INLINE RED4ext::RawBufferAllocator::RawBufferAllocator(Memory::IAllocator* aAllocator)
+    : allocator(aAllocator ? *reinterpret_cast<uintptr_t*>(aAllocator) : 0)
+{
+}
+
+RED4EXT_INLINE void* RED4ext::RawBufferAllocator::ReallocAligned(void* aData, uint32_t aSize, uint32_t aAlignment) const
+{
+    auto innerAllocator = reinterpret_cast<const Memory::IAllocator*>(&allocator);
+
+    if (!innerAllocator)
+        return nullptr;
+
+    Memory::AllocationResult allocation{aData, 0};
+    return innerAllocator->ReallocAligned(allocation, aSize, aAlignment).memory;
+}
+
+RED4EXT_INLINE void RED4ext::RawBufferAllocator::Free(void* aData) const
+{
+    auto innerAllocator = reinterpret_cast<const Memory::IAllocator*>(&allocator);
+
+    if (!innerAllocator)
+        return;
+
+    Memory::AllocationResult allocation{aData, 0};
+    innerAllocator->Free(allocation);
+}
+
+RED4EXT_INLINE RED4ext::Memory::IAllocator* RED4ext::RawBufferAllocator::GetAllocator() const
+{
+    return reinterpret_cast<Memory::IAllocator*>(const_cast<uintptr_t*>(&allocator));
+}
+
 RED4EXT_INLINE RED4ext::RawBuffer::RawBuffer()
     : data(nullptr)
     , size(0)
@@ -20,21 +52,85 @@ RED4EXT_INLINE RED4ext::RawBuffer::RawBuffer(void* aData, uint32_t aSize, uint32
 {
 }
 
+RED4EXT_INLINE RED4ext::RawBuffer::RawBuffer(RawBuffer&& aOther)
+    : RawBuffer()
+{
+    Swap(aOther);
+}
+
 RED4EXT_INLINE RED4ext::RawBuffer::~RawBuffer()
 {
-    if (data && allocator[0])
+    Clear();
+}
+
+RED4EXT_INLINE RED4ext::RawBuffer& RED4ext::RawBuffer::operator=(RawBuffer&& aRhs)
+{
+    RawBuffer(std::move(aRhs)).Swap(*this);
+    return *this;
+}
+
+RED4EXT_INLINE RED4ext::Memory::IAllocator* RED4ext::RawBuffer::GetAllocator() const
+{
+    if (!allocator[0])
     {
-        reinterpret_cast<RawBufferAllocator*>(&allocator)->Free(data);
+        return nullptr;
     }
+
+    return reinterpret_cast<const RawBufferAllocator*>(&allocator)->GetAllocator();
+}
+
+RED4EXT_INLINE void RED4ext::RawBuffer::Initialize(Memory::IAllocator* aAllocator, uint32_t aSize, uint32_t aAlignment)
+{
+    if (data)
+    {
+        return;
+    }
+
+    if (!aAllocator)
+    {
+        aAllocator = AllocatorType::Get();
+    }
+
+    data = aAllocator->AllocAligned(aSize, aAlignment).memory;
+    size = aSize;
+    alignment = aAlignment;
+
+    new (reinterpret_cast<RawBufferAllocator*>(&allocator)) RawBufferAllocator(aAllocator);
 }
 
 RED4EXT_INLINE void RED4ext::RawBuffer::Resize(uint32_t aSize)
 {
+    if (!data || !allocator[0])
+    {
+        return;
+    }
+
+    data = reinterpret_cast<RawBufferAllocator*>(&allocator)->ReallocAligned(data, aSize, alignment);
+    size = aSize;
+}
+
+RED4EXT_INLINE void RED4ext::RawBuffer::Clear()
+{
     if (data && allocator[0])
     {
-        data = reinterpret_cast<RawBufferAllocator*>(&allocator)->ReallocAligned(data, aSize, alignment);
-        size = aSize;
+        reinterpret_cast<RawBufferAllocator*>(&allocator)->Free(data);
+
+        data = nullptr;
+        size = 0;
     }
+}
+
+RED4EXT_INLINE void RED4ext::RawBuffer::Swap(RawBuffer& aOther)
+{
+    std::swap(data, aOther.data);
+    std::swap(size, aOther.size);
+    std::swap(alignment, aOther.alignment);
+    std::swap(allocator, aOther.allocator);
+}
+
+RED4EXT_INLINE RED4ext::RawBuffer::operator bool() const noexcept
+{
+    return data;
 }
 
 RED4EXT_INLINE RED4ext::SharedPtr<RED4ext::DeferredDataBufferToken> RED4ext::DeferredDataBuffer::LoadAsync()
@@ -50,11 +146,11 @@ RED4EXT_INLINE RED4ext::SharedPtr<RED4ext::DeferredDataBufferToken> RED4ext::Def
 
 RED4EXT_INLINE RED4ext::SharedPtr<RED4ext::DeferredDataBufferCopyToken> RED4ext::DeferredDataBuffer::LoadCopyAsync()
 {
-    using LoadBufferRefAsync_t = void* (*)(DeferredDataBuffer*, SharedPtr<DeferredDataBufferCopyToken>*, int8_t);
+    using LoadBufferRefAsync_t = void* (*)(DeferredDataBuffer*, SharedPtr<DeferredDataBufferCopyToken>*, int8_t, bool);
     static UniversalRelocFunc<LoadBufferRefAsync_t> func(Detail::AddressHashes::DeferredDataBuffer_LoadRefAsync);
 
     SharedPtr<DeferredDataBufferCopyToken> token;
-    func(this, &token, 0);
+    func(this, &token, 0, false);
 
     return token;
 }
@@ -85,6 +181,5 @@ RED4EXT_INLINE void RED4ext::DeferredDataBufferCopyToken::OnLoaded(LoadedCallbac
 {
     JobQueue jobQueue;
     jobQueue.Wait(job);
-    jobQueue.Dispatch([self = self.Lock(), callback = std::move(aCallback)]()
-                      { callback(self); });
+    jobQueue.Dispatch([self = self.Lock(), callback = std::move(aCallback)]() { callback(self); });
 }

@@ -11,11 +11,13 @@ namespace RED4ext
 {
 struct RawBufferAllocator
 {
-    virtual void* ReallocAligned(void* aData, uint32_t aSize, uint32_t aAlignment) = 0; // 00
-    virtual void Free(void* aData) = 0;                                                 // 08
-    virtual Memory::IAllocator GetAllocator() = 0;                                      // 10
+    RawBufferAllocator(Memory::IAllocator* aAllocator);
 
-    void* unk08;
+    virtual void* ReallocAligned(void* aData, uint32_t aSize, uint32_t aAlignment) const; // 00
+    virtual void Free(void* aData) const;                                                 // 08
+    virtual Memory::IAllocator* GetAllocator() const;                                     // 10
+
+    uintptr_t allocator;
 };
 RED4EXT_ASSERT_SIZE(RawBufferAllocator, 0x10);
 
@@ -26,10 +28,19 @@ struct RawBuffer
     RawBuffer();
     RawBuffer(void* aData, uint32_t aSize, uint32_t aAlignment = 8);
     RawBuffer(const RawBuffer&) = delete;
-    RawBuffer(RawBuffer&&) = default;
+    RawBuffer(RawBuffer&& aOther);
     ~RawBuffer();
 
+    RawBuffer& operator=(const RawBuffer& aRhs) = delete;
+    RawBuffer& operator=(RawBuffer&& aRhs);
+
+    Memory::IAllocator* GetAllocator() const;
+    void Initialize(Memory::IAllocator* aAllocator, uint32_t aSize, uint32_t aAlignment = 8);
     void Resize(uint32_t aSize);
+    void Clear();
+    void Swap(RawBuffer& aOther);
+
+    operator bool() const noexcept;
 
     void* data;            // 00
     uint32_t size;         // 08

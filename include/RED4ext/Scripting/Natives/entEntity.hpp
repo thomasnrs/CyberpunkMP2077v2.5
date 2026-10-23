@@ -13,6 +13,23 @@
 
 namespace RED4ext
 {
+namespace world
+{
+struct RuntimeScene;
+}
+
+enum class EntityStatus : uint8_t
+{
+    Undefined = 0,
+    Initializing = 1,
+    Detached = 2,
+    Attaching = 3,
+    Attached = 4,
+    Detaching = 5,
+    Uninitializing = 6,
+    Uninitialized = 7,
+};
+
 namespace ent
 {
 struct Entity : IScriptable

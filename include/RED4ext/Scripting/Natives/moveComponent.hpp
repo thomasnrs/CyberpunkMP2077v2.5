@@ -2,12 +2,13 @@
 
 // clang-format off
 
-// This file is generated from the Game's Reflection data
-
 #include <cstdint>
 #include <RED4ext/Common.hpp>
+#include <RED4ext/Containers/DynArray.hpp>
+#include <RED4ext/Scripting/Natives/Generated/WorldTransform.hpp>
 #include <RED4ext/Scripting/Natives/Generated/ent/IMoverComponent.hpp>
-#include <RED4ext/Scripting/Natives/Generated/Vector3.hpp>
+#include <RED4ext/Scripting/Natives/Vector3.hpp>
+#include <RED4ext/Scripting/Natives/Vector4.hpp>
 
 namespace RED4ext
 {
@@ -19,7 +20,7 @@ struct MovementRepresentation
     Component* parent;
     bool active;
     DynArray<void*> stack;
-    int32 activeIndex;
+    int32_t activeIndex;
     void* activeEntry;
 };
 
@@ -28,17 +29,27 @@ struct __declspec(align(0x10)) Component : ent::IMoverComponent
     static constexpr const char* NAME = "moveComponent";
     static constexpr const char* ALIAS = NAME;
 
-    uint8_t unk90[0x138 - 0x90]; // 90
-    MovementRepresentation representation;
-    uint8_t unk1C8[0x220 - 0x168]; // 168
-    Vector3 speed; // 220
-    uint8_t unk22C[0x2C0 - 0x22C]; // 22C
+    uint8_t unk90[0x138 - 0x90];                  // 90
+    MovementRepresentation representation;        // 138 - hand-decoded by CyberpunkMP
+    uint8_t unk168[0x1C0 - 0x168];                // 168
+    WorldTransform worldTransform;                // 1C0
+    uint8_t unk1E0[0x1E8 - 0x1E0];                // 1E0
+    Vector4 position;                             // 1E8
+    uint8_t unk1F8[0x220 - 0x1F8];                // 1F8
+    Vector3 speed;                                // 220
+    float deltaFrame;                             // 22C
+    uint8_t unk230[0x2C0 - 0x230];                // 230
 };
+RED4EXT_ASSERT_SIZE(MovementRepresentation, 0x30);
+RED4EXT_ASSERT_OFFSET(MovementRepresentation, activeEntry, 0x28);
+RED4EXT_ASSERT_SIZE(Component, 0x2C0);
+RED4EXT_ASSERT_OFFSET(Component, representation, 0x138);
+RED4EXT_ASSERT_OFFSET(Component, worldTransform, 0x1C0);
+RED4EXT_ASSERT_OFFSET(Component, position, 0x1E8);
+RED4EXT_ASSERT_OFFSET(Component, speed, 0x220);
+RED4EXT_ASSERT_OFFSET(Component, deltaFrame, 0x22C);
 } // namespace move
+using moveComponent = move::Component;
 } // namespace RED4ext
-
-RED4EXT_ASSERT_SIZE(RED4ext::move::MovementRepresentation, 0x30);
-RED4EXT_ASSERT_OFFSET(RED4ext::move::MovementRepresentation, activeEntry, 0x28);
-RED4EXT_ASSERT_OFFSET(RED4ext::move::Component, speed, 0x220);
 
 // clang-format on

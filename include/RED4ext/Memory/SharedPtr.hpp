@@ -5,8 +5,8 @@
 
 #include <Windows.h>
 
-#include <RED4ext/Detail/AddressHashes.hpp>
 #include <RED4ext/Common.hpp>
+#include <RED4ext/Detail/AddressHashes.hpp>
 #include <RED4ext/Memory/Utils.hpp>
 #include <RED4ext/Relocation.hpp>
 
@@ -112,7 +112,7 @@ protected:
         return false;
     }
 
-    void MoveConstructFrom(SharedPtrBase&& aOther) noexcept
+    void MoveConstructFrom(SharedPtrBase& aOther) noexcept
     {
         instance = aOther.instance;
         refCount = aOther.refCount;
@@ -270,7 +270,7 @@ public:
 
     SharedPtr(SharedPtr&& aRhs) noexcept
     {
-        BaseType::MoveConstructFrom(std::move(aRhs));
+        BaseType::MoveConstructFrom(aRhs);
     }
 
     SharedPtr(const WeakPtr<T>& aOther) noexcept
@@ -339,7 +339,7 @@ public:
 
     WeakPtr(WeakPtr&& aOther) noexcept
     {
-        BaseType::MoveConstructFrom(std::move(aOther));
+        BaseType::MoveConstructFrom(aOther);
     }
 
     ~WeakPtr() noexcept
@@ -382,9 +382,24 @@ public:
 };
 RED4EXT_ASSERT_SIZE(WeakPtr<void>, 0x10);
 
+// clang-format off
+template<typename T>
+concept IsSelfReference = requires(T* t)
+{
+    { &t->self } -> std::same_as<WeakPtr<T>*>;
+};
+// clang-format on
+
 template<typename T, typename... Args>
 inline SharedPtr<T> MakeShared(Args&&... args)
 {
-    return SharedPtr<T>(Memory::New<T>(std::forward<Args>(args)...));
+    SharedPtr<T> instance(Memory::New<T>(std::forward<Args>(args)...));
+
+    if constexpr (IsSelfReference<T>)
+    {
+        instance->self = instance;
+    }
+
+    return instance;
 }
 } // namespace RED4ext

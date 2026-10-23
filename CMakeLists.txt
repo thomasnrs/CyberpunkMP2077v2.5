@@ -4,7 +4,7 @@ include(CMakeDependentOption)
 
 project(
   RED4ext.SDK
-  VERSION 0.5.0
+  VERSION 1.0.0
   LANGUAGES CXX
 )
 
@@ -27,6 +27,7 @@ cmake_dependent_option(RED4EXT_USE_PCH "Use precompiled headers to speed up comp
 
 set(RED4EXT_CMAKE_DIR "${PROJECT_SOURCE_DIR}/cmake")
 set(RED4EXT_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include/")
+set(RED4EXT_VENDOR_DIR "${PROJECT_SOURCE_DIR}/vendor/")
 
 # -----------------------------------------------------------------------------
 # Options related to warnings
@@ -67,6 +68,7 @@ if(RED4EXT_HEADER_ONLY)
     RED4ext.SDK
     INTERFACE
       "$<BUILD_INTERFACE:${RED4EXT_INCLUDE_DIR}>"
+      "$<BUILD_INTERFACE:${RED4EXT_VENDOR_DIR}/D3D12MemAlloc>"
       "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
   )
 else()
@@ -99,10 +101,17 @@ else()
     RED4ext.SDK
     PUBLIC
       "$<BUILD_INTERFACE:${RED4EXT_INCLUDE_DIR}>"
+      "$<BUILD_INTERFACE:${RED4EXT_VENDOR_DIR}/D3D12MemAlloc>"
       "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
   )
 
-  target_compile_definitions(RED4ext.SDK PUBLIC RED4EXT_STATIC_LIB)
+  target_compile_definitions(
+    RED4ext.SDK
+      PUBLIC
+        RED4EXT_STATIC_LIB
+      PRIVATE
+        WIN32_LEAN_AND_MEAN
+  )
 
   if(RED4EXT_USE_PCH)
     set(RED4EXT_PCH_FILE "${PROJECT_BINARY_DIR}/red4ext_pch.hpp")

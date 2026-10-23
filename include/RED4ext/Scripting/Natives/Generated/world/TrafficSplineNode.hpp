@@ -7,7 +7,7 @@
 #include <cstdint>
 #include <RED4ext/Common.hpp>
 #include <RED4ext/CName.hpp>
-#include <RED4ext/DynArray.hpp>
+#include <RED4ext/Containers/DynArray.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/TrafficLaneExitDefinition.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/TrafficLightDefinition.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/TrafficSourceNode.hpp>
@@ -35,7 +35,8 @@ struct TrafficSplineNode : world::TrafficSourceNode
     bool neverDeadEnd; // B9
     bool trafficDisabled; // BA
     bool noAIDriving; // BB
-    uint8_t unkBC[0xC0 - 0xBC]; // BC
+    bool noAutodrive; // BC
+    uint8_t unkBD[0xC0 - 0xBD]; // BD
 };
 RED4EXT_ASSERT_SIZE(TrafficSplineNode, 0xC0);
 } // namespace world

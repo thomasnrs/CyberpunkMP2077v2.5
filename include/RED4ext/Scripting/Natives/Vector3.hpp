@@ -1,6 +1,7 @@
 #pragma once
 
 #include <RED4ext/Common.hpp>
+
 #include <cstdint>
 
 namespace RED4ext
@@ -51,7 +52,7 @@ struct Vector3
         return {X - aOther.X, Y - aOther.Y, Z - aOther.Z};
     }
 
-    inline Vector3 operator*(const float aScalar) const
+    inline Vector3 operator*(float aScalar) const
     {
         return {X * aScalar, Y * aScalar, Z * aScalar};
     }
@@ -98,6 +99,16 @@ struct Vector3
     inline Vector3 Cross(const Vector3& aOther) const
     {
         return {Y * aOther.Z - Z * aOther.Y, Z * aOther.X - X * aOther.Z, X * aOther.Y - Y * aOther.X};
+    }
+
+    inline Vector3 Min(const Vector3& aOther) const
+    {
+        return {(std::min)(X, aOther.X), (std::min)(Y, aOther.Y), (std::min)(Z, aOther.Z)};
+    }
+
+    inline Vector3 Max(const Vector3& aOther) const
+    {
+        return {(std::max)(X, aOther.X), (std::max)(Y, aOther.Y), (std::max)(Z, aOther.Z)};
     }
 
     float X; // 00

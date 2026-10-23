@@ -4,10 +4,18 @@
 
 // This file is generated from the Game's Reflection data
 
+#include <RED4ext/Scripting/Natives/MorphTargetMesh.hpp>
+
+namespace RED4ext
+{
+RED4EXT_ASSERT_SIZE(MorphTargetMesh, 0xD0);
+} // namespace RED4ext
+
+/*
 #include <cstdint>
 #include <RED4ext/Common.hpp>
 #include <RED4ext/CName.hpp>
-#include <RED4ext/DynArray.hpp>
+#include <RED4ext/Containers/DynArray.hpp>
 #include <RED4ext/Handle.hpp>
 #include <RED4ext/NativeTypes.hpp>
 #include <RED4ext/Scripting/Natives/Generated/Box.hpp>
@@ -36,5 +44,6 @@ struct __declspec(align(0x10)) MorphTargetMesh : res::StreamedResource
 };
 RED4EXT_ASSERT_SIZE(MorphTargetMesh, 0xD0);
 } // namespace RED4ext
+*/
 
 // clang-format on

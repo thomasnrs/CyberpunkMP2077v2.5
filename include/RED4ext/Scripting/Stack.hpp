@@ -16,16 +16,19 @@ namespace RED4ext
  * Maybe this should have the name 'CStack', but I am not entirely sure how to call '*Stack', so until a better name is
  * found, the names will be kept as they are now.
  */
-struct CBaseRTTIType;
+namespace rtti
+{
+struct IType;
+}
 struct CClass;
 struct IScriptable;
 
 struct CStackType
 {
-    CStackType(CBaseRTTIType* aType = nullptr, ScriptInstance aValue = nullptr);
+    CStackType(rtti::IType* aType = nullptr, void* aValue = nullptr);
 
-    CBaseRTTIType* type;  // 00
-    ScriptInstance value; // 08
+    rtti::IType* type; // 00
+    void* value;       // 08
 };
 RED4EXT_ASSERT_SIZE(CStackType, 0x10);
 
@@ -40,7 +43,7 @@ struct IStack
         return nullptr;
     }
 
-    virtual CBaseRTTIType* GetResultType() // 10
+    virtual rtti::IType* GetResultType() // 10
     {
         return nullptr;
     }
@@ -79,7 +82,7 @@ RED4EXT_ASSERT_SIZE(CBaseStack, 0x30);
 
 struct CStack : CBaseStack
 {
-    CStack(ScriptInstance aContext = nullptr, CStackType* aArgs = nullptr, uint32_t aArgsCount = 0,
+    CStack(void* aContext = nullptr, CStackType* aArgs = nullptr, uint32_t aArgsCount = 0,
            CStackType* aResult = nullptr);
     ~CStack() = default;
 
@@ -98,9 +101,9 @@ struct CScriptStack : CBaseStack
 {
     ~CScriptStack() override = default;
 
-    uint8_t* args;        // 30
-    ScriptInstance value; // 38
-    CBaseRTTIType* type;  // 40
+    uint8_t* args;     // 30
+    void* value;       // 38
+    rtti::IType* type; // 40
 };
 
 RED4EXT_ASSERT_SIZE(CScriptStack, 0x48);
@@ -111,22 +114,32 @@ RED4EXT_ASSERT_OFFSET(CScriptStack, type, 0x40);
 struct CStackFrame
 {
     CStackFrame(IScriptable* aContext, char* aCode, void* aUnk = nullptr);
+    ~CStackFrame();
 
-    char* code;              // 00
-    CBaseFunction* func;     // 08 - For scripted functions
-    void* localVars;         // 10 - For scripted functions
-    void* params;            // 18 - For scripted functions
-    int64_t unk20;           // 20
-    int64_t unk28;           // 28
-    void* data;              // 30 - The result of the opcode, points to the original instance (local, param, etc.)
-    CBaseRTTIType* dataType; // 38 - The type of the result
-    IScriptable* context;    // 40
-    CStackFrame* parent;     // 48
-    int16_t unk50;           // 50
-    int64_t unk58;           // 58
-    uint16_t paramFlags;     // 60
-    uint8_t currentParam;    // 62
-    bool useDirectData;      // 63 - If set the result param is not used, preventing an extra copy of the result
+    // Root frames point to their own call map (unk98 -> unk68), so they can't be copied.
+    CStackFrame(const CStackFrame&) = delete;
+    CStackFrame& operator=(const CStackFrame&) = delete;
+
+    char* code;            // 00
+    CBaseFunction* func;   // 08 - For scripted functions
+    void* localVars;       // 10 - For scripted functions
+    void* params;          // 18 - For scripted functions
+    int64_t unk20;         // 20
+    int64_t unk28;         // 28
+    void* data;            // 30 - The result of the opcode, points to the original instance (local, param, etc.)
+    rtti::IType* dataType; // 38 - The type of the result
+    IScriptable* context;  // 40
+    CStackFrame* parent;   // 48
+    int16_t unk50;         // 50
+    int64_t unk58;         // 58
+    uint16_t paramFlags;   // 60
+    uint8_t currentParam;  // 62
+    bool useDirectData;    // 63 - If set the result param is not used, preventing an extra copy of the result
+    bool isRoot;           // 64 - Set when the frame has no parent
+    uint8_t unk65[3];      // 65
+    uint8_t unk68[0x30];   // 68 - HashMap (PoolScript), owned by the root frame
+    void* unk98;           // 98 - Points to unk68 of the root frame, inherited by child frames
+    uint8_t unkA0;         // A0
 
     void Step()
     {
@@ -138,7 +151,11 @@ struct CStackFrame
         return (paramFlags & (1 << currentParam)) != 0;
     }
 };
-RED4EXT_ASSERT_SIZE(CStackFrame, 0x68);
+RED4EXT_ASSERT_SIZE(CStackFrame, 0xA8);
+RED4EXT_ASSERT_OFFSET(CStackFrame, isRoot, 0x64);
+RED4EXT_ASSERT_OFFSET(CStackFrame, unk68, 0x68);
+RED4EXT_ASSERT_OFFSET(CStackFrame, unk98, 0x98);
+RED4EXT_ASSERT_OFFSET(CStackFrame, unkA0, 0xA0);
 } // namespace RED4ext
 
 #ifdef RED4EXT_HEADER_ONLY

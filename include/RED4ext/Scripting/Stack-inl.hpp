@@ -5,6 +5,7 @@
 #endif
 
 #include <bit>
+#include <cstring>
 
 #include <RED4ext/Detail/AddressHashes.hpp>
 #include <RED4ext/RTTISystem.hpp>
@@ -31,14 +32,13 @@ RED4EXT_INLINE RED4ext::IScriptable* RED4ext::CBaseStack::GetContext() const
     return nullptr;
 }
 
-RED4EXT_INLINE RED4ext::CStackType::CStackType(CBaseRTTIType* aType, ScriptInstance aValue)
+RED4EXT_INLINE RED4ext::CStackType::CStackType(rtti::IType* aType, void* aValue)
     : type(aType)
     , value{aValue}
 {
 }
 
-RED4EXT_INLINE RED4ext::CStack::CStack(ScriptInstance aContext, CStackType* aArgs, uint32_t aArgsCount,
-                                       CStackType* aResult)
+RED4EXT_INLINE RED4ext::CStack::CStack(void* aContext, CStackType* aArgs, uint32_t aArgsCount, CStackType* aResult)
 
     : CBaseStack(static_cast<IScriptable*>(aContext))
     , args(aArgs)
@@ -66,4 +66,21 @@ RED4EXT_INLINE RED4ext::CStackFrame::CStackFrame(IScriptable* aContext, char* aC
     paramFlags = 0;
     currentParam = 0;
     useDirectData = false;
+    isRoot = true;
+
+    // Same initialization as the game's call map constructor.
+    static UniversalRelocVtbl poolScriptVtbl(Detail::AddressHashes::Memory_PoolScript_vtbl);
+    std::memset(unk68, 0, sizeof(unk68));
+    *reinterpret_cast<uint32_t*>(&unk68[0x20]) = 0xFFFFFFFF;
+    *reinterpret_cast<uintptr_t*>(&unk68[0x28]) = reinterpret_cast<uintptr_t>(static_cast<uintptr_t*>(poolScriptVtbl));
+
+    unk98 = unk68;
+    unkA0 = 0;
+}
+
+RED4EXT_INLINE RED4ext::CStackFrame::~CStackFrame()
+{
+    using func_t = void (*)(CStackFrame*);
+    static UniversalRelocFunc<func_t> dtor(Detail::AddressHashes::CStackFrame_dtor);
+    dtor(this);
 }
