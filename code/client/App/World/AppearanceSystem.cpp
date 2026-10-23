@@ -180,7 +180,11 @@ void AddItems(Red::Handle<Red::game::Object> & object, Red::DynArray<Red::TweakD
 
         auto placementSlot = placementSlotHandle.instance->recordID;
 
-        auto appearanceName = EvalCName(&item_record.instance->appearanceName);
+        // Read from the TweakDB flat by name: the hand-decoded Item_Record field list stopped
+        // matching on 2.5 (the record grew by 0x10), and the flat does not depend on the layout.
+        Red::CName appearanceName;
+        if (auto* pFlat = Red::TweakDB::Get()->GetFlatValue(Red::TweakDBID(item, ".appearanceName")))
+            appearanceName = *pFlat->GetValue<Red::CName>();
         std::string appearance = appearanceName.ToString();
         // auto suffixes = EvalArrayTweakDBID(&item_record.instance->appearanceSuffixes);
         // for (auto const suffix : suffixes) {

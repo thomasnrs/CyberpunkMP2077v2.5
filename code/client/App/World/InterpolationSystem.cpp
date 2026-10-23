@@ -7,6 +7,7 @@
 
 #include <App/Settings.h>
 #include <App/World/NetworkWorldSystem.h>
+#include "Game/Probe.h"
 
 extern std::filesystem::path GCyberpunkMpLocation;
 
@@ -90,6 +91,12 @@ void SyncTraceOut(const uint64_t aId, const int64_t aRenderTick, const glm::vec3
 
 inline void SetSimpleMovement(Red::vehicle::IMoveSystem* apMoveSystem, const Red::EntityID& aEntityId, bool enabled)
 {
+    // vtable+0x1F0 was mapped on 2.31 and has no name to look up. Until the function in that
+    // slot is confirmed on 2.5, log where it points and do not call it.
+    static const bool s_verified = Game::Probe::VirtualSlotVerified(apMoveSystem, 0x1F0, "vehicle IMoveSystem SetSimpleMovement");
+    if (!s_verified)
+        return;
+
     reinterpret_cast<void (*)(Red::vehicle::IMoveSystem*, const Red::EntityID&, bool)>(*(uintptr_t*)(*(uintptr_t*)apMoveSystem + 0x1F0))(apMoveSystem, aEntityId, enabled);
 }
 
@@ -955,6 +962,9 @@ void HookIdleController_SetAnimation(Game::Controller* apController, AnimationDa
                     spdlog::warn("[Interpolation] puppet {:x} has no move component right now - attach skipped", id.hash);
                     return;
                 }
+
+                if (!Game::Probe::MoveComponentLayoutOk(moveComponent.instance))
+                    return;
 
                 const auto entityQuery = pSystem->query<const EntityComponent>();
                 auto flecsEntity = entityQuery.find([id](const EntityComponent& component) { return component.Id == id; });

@@ -9,6 +9,7 @@
 #include <RED4ext/Scripting/Natives/CResource.hpp>
 #include <RED4ext/Scripting/Natives/Generated/world/RuntimeSystemEntityAppearanceChanger.hpp>
 #include "Game/Utils.h"
+#include "Game/Probe.h"
 
 using namespace Red;
 
@@ -70,11 +71,12 @@ constexpr auto ScheduleSynchronizedAppearanceChanges = Core::RawFunc<386815609UL
     )>();
 
 // CharacterCustomizationSystem
-// THandle<game::ui::CharacterCustomizationState> unk78
+// THandle<game::ui::CharacterCustomizationState> unk78 on 2.31; the class grew by 0x40 on 2.5,
+// so the handle is located by Game::Probe instead of a fixed offset.
 
 // could use game::ui::CharacterCustomizationState::Serialize to pass data to server
 
-inline Handle<game::ui::CharacterCustomizationState> * GetCustomizationState(game::ui::CharacterCustomizationSystem * self) 
+inline Handle<game::ui::CharacterCustomizationState> * GetCustomizationState(game::ui::CharacterCustomizationSystem * self)
 {
-    return reinterpret_cast<Handle<game::ui::CharacterCustomizationState> *>((uintptr_t)self + 0x78);
+    return Game::Probe::CustomizationStateHandle(self);
 }

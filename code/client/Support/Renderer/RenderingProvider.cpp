@@ -59,13 +59,15 @@ void Support::RenderingProvider::OnInitialize()
 
 void Support::RenderingProvider::Present(int32_t* apDeviceIndex, uint8_t aSomeSync, UINT aSyncInterval)
 {
-    const auto* pContext = Game::Rendering::Context::GetInstance();
-    auto* pSwapChain = pContext->devices[*apDeviceIndex - 1].pSwapChain;
+    auto* pDeviceData = Game::Rendering::GetDeviceData();
+    const auto swapChainId = static_cast<uint32_t>(*apDeviceIndex);
+    if (!pDeviceData || !pDeviceData->swapChains.IsUsedID(swapChainId))
+        return;
 
     if (!m_initialized)
     {
-        m_pCommandQueue = pContext->pDirectQueue;
-        m_pdxgiSwapChain = pSwapChain;
+        m_pCommandQueue = pDeviceData->directCommandQueue;
+        m_pdxgiSwapChain = pDeviceData->swapChains.GetData(swapChainId).swapChain;
         Initialize();
         return;
     }

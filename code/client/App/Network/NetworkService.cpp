@@ -435,6 +435,8 @@ void NetworkService::SendSpawnCharacterRequest()
 
     if (stateHandle && stateHandle->instance)
     {
+        Game::Probe::CheckCustomizationState(stateHandle->instance, "local player");
+
         auto writer = CMPWriter();
         CharacterCustomizationState_Serialize(stateHandle->instance, &writer);
         spdlog::info("Got bytes: {}", writer.bytes.size());

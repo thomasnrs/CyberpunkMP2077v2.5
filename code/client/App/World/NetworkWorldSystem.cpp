@@ -28,6 +28,7 @@
 #include <RED4ext/Scripting/Natives/Generated/game/bb/ScriptDefinition.hpp>
 
 #include "App/Components/EntityComponent.h"
+#include "Game/Probe.h"
 #include "App/Components/SpawningComponent.h"
 #include "App/Components/InterpolationComponent.h"
 #include "App/Components/DriverComponent.h"
@@ -3212,13 +3213,17 @@ void NetworkWorldSystem::UpdatePlayerLocation() const
         }
         if (auto remote_id = GetVehicleSystem()->GetVehicleRemoteId(); remote_id != std::nullopt)
         {
+            auto* pRigidBody = Game::Probe::VehicleRigidBody(vehicle);
+            if (!pRigidBody)
+                return;
+
             auto transform = Red::WorldTransform();
 
-            transform = vehicle->rigidBody->currentTransform;
+            transform = pRigidBody->currentTransform;
 
             const auto cEntityPosition = transform.Position;
             const auto cEntityRotation = eulerAngles(Game::ToGlm(transform.Orientation));
-            float speed = vehicle->rigidBody->velocity.Magnitude();
+            float speed = pRigidBody->velocity.Magnitude();
 
             common::Vector3 pos;
             pos.set_x(cEntityPosition.x);

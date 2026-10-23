@@ -42,8 +42,11 @@ static void MakeRemoteDriven(const Red::Handle<Red::vehicle::WheeledBaseObject>&
     spdlog::info("[VehicleSystem] MakeRemoteDriven: SetIsPlayerControlled");
     SetIsPlayerControlled(aVehicle, false);
     // turn on engine
-    spdlog::info("[VehicleSystem] MakeRemoteDriven: engine vcall");
-    reinterpret_cast<void (*)(Red::vehicle::WheeledBaseObject*, bool)>(*(uintptr_t*)(*(uintptr_t*)aVehicle.instance + 0x328))(aVehicle, true);
+    // Was a call through vtable+0x328; the script native is found by name, so it survives
+    // vtable reshuffles between patches.
+    spdlog::info("[VehicleSystem] MakeRemoteDriven: TurnEngineOn");
+    if (!Red::CallVirtual(aVehicle.instance, "TurnEngineOn", true))
+        spdlog::warn("[VehicleSystem] MakeRemoteDriven: TurnEngineOn not found on this vehicle");
     spdlog::info("[VehicleSystem] MakeRemoteDriven: engineData {}", aVehicle->engineData ? "set" : "null");
     if (aVehicle->engineData)
         aVehicle->engineData->unk61 = 0;
