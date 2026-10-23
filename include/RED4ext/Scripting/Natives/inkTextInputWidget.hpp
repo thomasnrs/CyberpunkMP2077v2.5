@@ -19,16 +19,16 @@ struct __declspec(align(0x10)) TextInputWidget : ink::TextWidget
 
     virtual void sub_230(uint64_t) override; // draws the caret
 
-    uint8_t hasFocus; // 430
-    uint8_t unk431; // 431 caret highlight?
-    int32_t caretPosition; // 434
-    uint32_t unk438; // 438 caret hightlight counter
-    uint32_t maxLength; // 43C
-    RED4ext::Handle<RED4ext::IScriptable> OnFocusReceivedCallback; // 440
-    RED4ext::Handle<RED4ext::IScriptable> OnFocusLostCallback; // 450
+    uint8_t hasFocus; // 460
+    uint8_t unk431; // 461 caret highlight?
+    int32_t caretPosition; // 464
+    uint32_t unk438; // 468 caret hightlight counter
+    uint32_t maxLength; // 46C
+    RED4ext::Handle<RED4ext::IScriptable> OnFocusReceivedCallback; // 470
+    RED4ext::Handle<RED4ext::IScriptable> OnFocusLostCallback; // 480
     RED4ext::Handle<RED4ext::IScriptable> OnCharacterKeyCallback; // 460 processes ink::CharacterEvent
 };
-RED4EXT_ASSERT_SIZE(TextInputWidget, 0x470);
+RED4EXT_ASSERT_SIZE(TextInputWidget, 0x4A0);
 } // namespace ink
 using inkTextInputWidget = ink::TextInputWidget;
 using inkTextInput = ink::TextInputWidget;

@@ -24,17 +24,16 @@ struct __declspec(align(0x10)) WheeledBaseObject : vehicle::BaseObject
     static constexpr const char* NAME = "vehicleWheeledBaseObject";
     static constexpr const char* ALIAS = "WheeledObject";
 
-    // Hand-decoded by CyberpunkMP against an older patch where the base ended at 0xB90. The 2.5
-    // reflection data puts the base end at 0xBA0 and the size at 0xBF0, so these are shifted by
-    // 0x10. Unverified on 2.5 - check in game before trusting them.
-    void * interactionsMaybe;           // BA0
-    Transmission * transmissionData;    // BA8
-    Engine * engineData;                // BB0
-    void * burnoutData;                 // BB8
+    // Hand-decoded by CyberpunkMP. This block is 0x50 bytes on 2.31 and on 2.5, so the
+    // fields moved with the base (0xBA0 -> 0xBC0). Verified only by that size argument.
+    void * interactionsMaybe;           // BC0
+    Transmission * transmissionData;    // BC8
+    Engine * engineData;                // BD0
+    void * burnoutData;                 // BD8
 
-    uint8_t unkBC0[0xBF0 - 0xBC0]; // BC0
+    uint8_t unkBE0[0xC10 - 0xBE0]; // BE0
 };
-RED4EXT_ASSERT_SIZE(WheeledBaseObject, 0xBF0);
+RED4EXT_ASSERT_SIZE(WheeledBaseObject, 0xC10);
 } // namespace vehicle
 using vehicleWheeledBaseObject = vehicle::WheeledBaseObject;
 using WheeledObject = vehicle::WheeledBaseObject;

@@ -21,7 +21,7 @@ namespace ink
 
 //     uint8_t unk430[0x470 - 0x430]; // 430
 // };
-RED4EXT_ASSERT_SIZE(TextInputWidget, 0x470);
+RED4EXT_ASSERT_SIZE(TextInputWidget, 0x4A0);
 } // namespace ink
 using inkTextInputWidget = ink::TextInputWidget;
 using inkTextInput = ink::TextInputWidget;

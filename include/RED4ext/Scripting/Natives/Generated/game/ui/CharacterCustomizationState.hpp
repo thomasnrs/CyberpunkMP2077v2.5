@@ -17,8 +17,8 @@ struct CharacterCustomizationState : game::ui::ICharacterCustomizationState
     static constexpr const char* NAME = "gameuiCharacterCustomizationState";
     static constexpr const char* ALIAS = NAME;
 
-    // uint8_t unk40[0xF0 - 0x40]; // 40
-
+    // Hand-decoded by CyberpunkMP on 2.31. 2.5 grew this class by 0x20 and nothing says
+    // where; the offsets below assume the tail. UNVERIFIED on 2.5 - see Probe.cpp.
     uint8_t unk40; // 40
     bool isFinalized; // 41
     bool unk42; // 42
@@ -42,9 +42,9 @@ struct CharacterCustomizationState : game::ui::ICharacterCustomizationState
     uint64_t unkD8;
     uint64_t unkE0;
     uint64_t unkE8; // E8 callback
-
+    uint8_t unkF0[0x110 - 0xF0]; // F0 - new in 2.5, position assumed
 };
-RED4EXT_ASSERT_SIZE(CharacterCustomizationState, 0xF0);
+RED4EXT_ASSERT_SIZE(CharacterCustomizationState, 0x110);
 } // namespace game::ui
 using gameuiCharacterCustomizationState = game::ui::CharacterCustomizationState;
 } // namespace RED4ext

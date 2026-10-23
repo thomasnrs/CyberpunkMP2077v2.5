@@ -18,10 +18,10 @@ struct Puppet : game::PuppetBase
     static constexpr const char* ALIAS = NAME;
 
     uint8_t unk268[0x420 - 0x268]; // 268
-    Red::Handle<move::Component> moveComponent;
-    uint8_t unk428[0x5F8 - 0x430]; // 430
+    Red::Handle<move::Component> moveComponent; // 420 - from 2.31, UNVERIFIED on 2.5 (see Probe.cpp)
+    uint8_t unk430[0x618 - 0x430]; // 430
 };
-RED4EXT_ASSERT_SIZE(Puppet, 0x5F8);
+RED4EXT_ASSERT_SIZE(Puppet, 0x618);
 } // namespace game
 using gamePuppet = game::Puppet;
 } // namespace RED4ext
