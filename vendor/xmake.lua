@@ -4,4 +4,6 @@ target("RED4ext.SDK")
     add_files("RED4ext.SDK/src/**.cpp")
     add_headerfiles("RED4ext.SDK/include/**.hpp")
     add_includedirs("RED4ext.SDK/include/", { public = true })
+    -- The 2.5 SDK's GpuApi headers include D3D12MemAlloc.h, which it vendors here.
+    add_includedirs("RED4ext.SDK/vendor/D3D12MemAlloc/", { public = true })
     on_install(function() end)

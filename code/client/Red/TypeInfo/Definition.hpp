@@ -154,11 +154,11 @@ inline void ExtractArg(C* aContext, CStackFrame* aFrame, T* aArg)
 {
     using U = std::remove_cvref_t<T>;
 
-    if constexpr (I == 0 && !std::is_void_v<C> && std::is_base_of_v<IScriptable, C> && std::is_same_v<T, C*>)
+    if constexpr (I == 0 && !std::is_void_v<C> && std::is_base_of_v<ISerializable, C> && std::is_same_v<T, C*>)
     {
         *aArg = aContext;
     }
-    else if constexpr (I == 0 && !std::is_void_v<C> && !std::is_base_of_v<IScriptable, C> && std::is_same_v<T, C*>)
+    else if constexpr (I == 0 && !std::is_void_v<C> && !std::is_base_of_v<ISerializable, C> && std::is_same_v<T, C*>)
     {
         ScriptRef<C> ctx;
         ExtractArg(aFrame, &ctx);
@@ -306,7 +306,7 @@ inline void DescribeNativeFunction(CBaseFunction* aFunc, R(*)(Args...))
 template<typename C, typename R, typename... Args>
 inline void DescribeNativeFunction(CBaseFunction* aFunc, R (C::*)(Args...))
 {
-    if constexpr (!IsScriptable<C>)
+    if constexpr (!IsSerializable<C>)
     {
         aFunc->AddParam(ResolveTypeName<ScriptRef<C>>(), "self");
     }
@@ -390,7 +390,7 @@ inline RawBuffer MakeScriptForwardCode(CBaseFunction* aFunc)
     constexpr uint32_t BaseCodeSize = OpSize + OffsetSize * 2 + PointerSize + FlagsSize + OpSize;
     constexpr uint16_t BaseExitOffset = BaseCodeSize - OpSize - OffsetSize;
 
-    const uint32_t extraCodeSize = aFunc->params.size * (OpSize + PointerSize) + (aFunc->returnType ? 1 : 0);
+    const uint32_t extraCodeSize = aFunc->params.Size() * (OpSize + PointerSize) + (aFunc->returnType ? 1 : 0);
     const uint32_t finalCodeSize = BaseCodeSize + extraCodeSize;
     const uint16_t finalExitOffset = BaseExitOffset + extraCodeSize;
 
@@ -466,7 +466,7 @@ public:
     ClassDescriptor() : CClass({}, sizeof(TClass), {})
     {
         static_assert(std::is_class_v<TClass>, "TClass must be a struct or class");
-        static_assert(std::is_default_constructible_v<TClass>, "TClass must be default-constructible");
+        static_assert(std::is_abstract_v<TClass> || std::is_default_constructible_v<TClass>, "TClass must be default-constructible");
         static_assert(std::is_destructible_v<TClass>, "TClass must be destructible");
     }
 
@@ -517,6 +517,13 @@ public:
         }
     }
 
+    void SetNamespace(const char* aNamespace)
+    {
+        constexpr auto NamespaceDelimiter = ".";
+
+        SetAlias(std::string(aNamespace).append(NamespaceDelimiter).append(name.ToString()).data());
+    }
+
     template<class TContext, typename TRet, typename TRetType>
     CClassFunction* AddFunction(NativeFunctionPtr<TContext, TRet, TRetType> aFunc, const char* aName,
                                 CBaseFunction::Flags aFlags = {})
@@ -554,7 +561,7 @@ public:
             auto* ptr = Detail::MakeNativeFunction<AFunction>();
 
             CClassFunction* func;
-            if constexpr (Detail::IsScriptable<Context>)
+            if constexpr (Detail::IsSerializable<Context>)
             {
                 if constexpr (!std::is_same_v<TClass, Context>)
                 {
@@ -629,6 +636,17 @@ public:
         return prop;
     }
 
+    template<typename TProperty>
+    CProperty* AddProperty(uint32_t aOffset, const char* aName, CProperty::Flags aFlags = {})
+    {
+        auto* type = ResolveType<TProperty>();
+        auto* prop = CProperty::Create(type, aName, nullptr, aOffset, nullptr, aFlags);
+
+        props.PushBack(prop);
+
+        return prop;
+    }
+
     template<auto AProperty>
     requires Detail::IsPropertyPtr<decltype(AProperty)>
     CClassFunction* AddGetter(const char* aName)
@@ -649,7 +667,11 @@ public:
 template<typename TClass>
 class ClassDescriptorDefaultImpl : public ClassDescriptor<TClass>
 {
-    const bool IsEqual(const ScriptInstance aLhs, const ScriptInstance aRhs, uint32_t a3) final // 48
+#if defined(__APPLE__)
+    bool IsEqual(const void* aLhs, const void* aRhs, uint32_t a3) final // 48
+#else
+    const bool IsEqual(const void* aLhs, const void* aRhs, uint32_t a3) final // 48
+#endif
     {
         if constexpr (Detail::IsConstructionForwarded<TClass>)
         {
@@ -661,13 +683,17 @@ class ClassDescriptorDefaultImpl : public ClassDescriptor<TClass>
         }
         else
         {
-            using func_t = bool (*)(CClass*, const ScriptInstance, const ScriptInstance, uint32_t);
+            using func_t = bool (*)(CClass*, const void*, const void*, uint32_t);
+#if defined(RED4EXT_V1_SDK_VERSION_CURRENT) || defined(RED4EXT_SDK_0_5_0)
             static UniversalRelocFunc<func_t> func(RED4ext::Detail::AddressHashes::TTypedClass_IsEqual);
+#else
+            static RelocFunc<func_t> func(RED4ext::Addresses::TTypedClass_IsEqual);
+#endif
             return func(this, aLhs, aRhs, a3);
         }
     }
 
-    void Assign(ScriptInstance aLhs, const ScriptInstance aRhs) const final // 50
+    void Assign(void* aLhs, const void* aRhs) const final // 50
     {
         if constexpr (Detail::IsConstructionForwarded<TClass>)
         {
@@ -676,9 +702,14 @@ class ClassDescriptorDefaultImpl : public ClassDescriptor<TClass>
                 CClass::parent->Assign(aLhs, aRhs);
             }
         }
+        else if constexpr (std::is_copy_assignable_v<TClass>)
+        {
+            *static_cast<TClass*>(aLhs) = *static_cast<const TClass*>(aRhs);
+        }
         else if constexpr (std::is_copy_constructible_v<TClass>)
         {
-            new (aLhs) TClass(*static_cast<TClass*>(aRhs));
+            static_cast<TClass*>(aLhs)->~TClass();
+            new (aLhs) TClass(*static_cast<const TClass*>(aRhs));
         }
     }
 
@@ -698,7 +729,7 @@ class ClassDescriptorDefaultImpl : public ClassDescriptor<TClass>
         }
     }
 
-    void ConstructCls(ScriptInstance aMemory) const final // D8
+    void ConstructCls(void* aMemory) const final // D8
     {
         if constexpr (Detail::IsConstructionForwarded<TClass>)
         {
@@ -707,13 +738,13 @@ class ClassDescriptorDefaultImpl : public ClassDescriptor<TClass>
                 CClass::parent->ConstructCls(aMemory);
             }
         }
-        else
+        else if constexpr (!std::is_abstract_v<TClass>)
         {
             new (aMemory) TClass();
         }
     }
 
-    void DestructCls(ScriptInstance aMemory) const final // E0
+    void DestructCls(void* aMemory) const final // E0
     {
         if constexpr (Detail::IsConstructionForwarded<TClass>)
         {
@@ -756,9 +787,9 @@ public:
 
     bool HasOption(int64_t aValue)
     {
-        for (uint32_t i = 0; i != valueList.size; ++i)
+        for (uint32_t i = 0; i != valueList.Size(); ++i)
         {
-            if (aValue == valueList.entries[i])
+            if (aValue == valueList[i])
                 return true;
         }
 
@@ -767,9 +798,9 @@ public:
 
     bool HasOption(CName aName)
     {
-        for (uint32_t i = 0; i != valueList.size; ++i)
+        for (uint32_t i = 0; i != valueList.Size(); ++i)
         {
-            if (aName == hashList.entries[i])
+            if (aName == hashList[i])
                 return true;
         }
 
@@ -789,9 +820,9 @@ public:
         if (aValue > Limits::max())
             return;
 
-        for (uint32_t i = 0; i != valueList.size; ++i)
+        for (uint32_t i = 0; i != valueList.Size(); ++i)
         {
-            if (aValue == valueList.entries[i])
+            if (aValue == valueList[i])
                 return;
         }
 
@@ -936,7 +967,7 @@ struct SystemBuilder
     {
         constexpr auto systemRefStr = GetTypeNameStr<Handle<TSystem>>();
         constexpr auto systemTypeStr = GetTypeNameStr<TSystem>();
-        constexpr auto systemNameStr = Red::Detail::UpFirstConstStr<systemTypeStr.size()>(systemTypeStr.data());
+        constexpr auto systemNameStr = Detail::UpFirstConstStr<systemTypeStr.size()>(systemTypeStr.data());
         constexpr auto getterNameStr = Detail::ConcatConstStr<3, systemNameStr.size() - 1>("Get", systemNameStr.data());
 
         auto gameType = GetClass<ScriptGameInstance>();
@@ -1000,7 +1031,9 @@ struct ClassDefinition
     {
         constexpr auto name = GetTypeNameStr<TClass>();
 
-        auto* type = new Descriptor();
+        auto* type = Red::Memory::RTTIAllocator::Get()->Alloc<Descriptor>();
+        new (type) Descriptor();
+
         type->name = CNamePool::Add(name.data());
 
         if constexpr (Detail::HasRegisterHandler<Specialization, Descriptor>)
@@ -1038,6 +1071,13 @@ struct ClassDefinition
                 {
                     type->parent = GetClass<IScriptable>();
                 }
+            }
+        }
+        else if constexpr (Detail::IsSerializable<TClass>)
+        {
+            if (!type->parent)
+            {
+                type->parent = GetClass<ISerializable>();
             }
         }
 
