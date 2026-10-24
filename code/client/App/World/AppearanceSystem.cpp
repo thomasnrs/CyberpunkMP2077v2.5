@@ -1,6 +1,7 @@
 #include "App/World/AppearanceSystem.h"
 
 #include <memory>
+#include <set>
 
 #include "RED4ext/Scripting/Natives/gameIEntityStubSystem.hpp"
 #include "RED4ext/Scripting/Natives/gameITransactionSystem.hpp"
@@ -149,6 +150,98 @@ std::string AppearanceSystem::GetEntityName(Red::EntityID entityID) const
     return it == m_playerNames.end() ? std::string() : it->second;
 }
 
+/*
+ * GiveItem and AddItemToSlot go through the transaction system's SCRIPT natives, by name.
+ *
+ * They used to be virtual calls at hand-mapped vtable slots (0x250, 0x390). On 2.5 the
+ * AddItemToSlot slot lands in an unrelated function that reads 0xFFFFFFFF - the first remote
+ * player to spawn crashed the client every time. A function found by name cannot drift.
+ *
+ * RedLib's call checks the argument count and every type against the function and refuses a
+ * mismatch instead of calling it, so a wrong guess at the optional parameters fails cleanly.
+ * The real parameter list is logged once, so a refusal can be read rather than guessed at.
+ */
+static Red::CBaseFunction* FindTransactionNative(Red::game::ITransactionSystem* apSystem, const char* apName)
+{
+    auto* pFunc = Red::GetFunction(apSystem->GetType(), apName);
+
+    static std::set<std::string> s_logged;
+    if (s_logged.insert(apName).second)
+    {
+        if (!pFunc)
+        {
+            spdlog::error("[Appearance] TransactionSystem.{} not found", apName);
+            return nullptr;
+        }
+
+        std::string params;
+        for (const auto* pParam : pFunc->params)
+        {
+            params += std::format("{}{}: {}, ", pParam->flags.isOptional ? "opt " : "", pParam->name.ToString(),
+                                  pParam->type->GetName().ToString());
+        }
+        spdlog::info("[Appearance] TransactionSystem.{}({}) -> {}", apName, params,
+                     pFunc->returnType ? pFunc->returnType->type->GetName().ToString() : "Void");
+    }
+
+    return pFunc;
+}
+
+static bool GiveItemByName(Red::game::ITransactionSystem* apSystem, Red::Handle<Red::game::Object>& aObject,
+                           Red::ItemID& aItemID, int32_t aQuantity)
+{
+    static auto* pFunc = FindTransactionNative(apSystem, "GiveItem");
+    if (!pFunc)
+        return false;
+
+    bool result = false;
+    bool called = false;
+    switch (pFunc->params.Size())
+    {
+    case 3: called = Red::Detail::CallFunctionWithArgs(nullptr, pFunc, apSystem, result, aObject, aItemID, aQuantity); break;
+    case 4: called = Red::Detail::CallFunctionWithArgs(nullptr, pFunc, apSystem, result, aObject, aItemID, aQuantity, nullptr); break;
+    }
+
+    if (!called)
+        spdlog::warn("[Appearance] TransactionSystem.GiveItem refused the call - see its logged signature");
+
+    return called && result;
+}
+
+static bool AddItemToSlotByName(Red::game::ITransactionSystem* apSystem, Red::Handle<Red::game::Object>& aObject,
+                                Red::TweakDBID aSlot, Red::ItemID& aItemID, Red::CName aGarmentAppearance)
+{
+    static auto* pFunc = FindTransactionNative(apSystem, "AddItemToSlot");
+    if (!pFunc)
+        return false;
+
+    // The vanilla script order after (obj, slotID, itemID): highPriority, itemObject,
+    // renderingPlane, keepWorldTransform, ignoreRestrictions, garmentAppearanceName.
+    bool highPriority = true;
+    auto renderingPlane = Red::ERenderingPlane::RPl_Scene;
+    bool keepWorldTransform = false;
+    bool ignoreRestrictions = false;
+
+    bool result = false;
+    bool called = false;
+    switch (pFunc->params.Size())
+    {
+    case 3:
+        called = Red::Detail::CallFunctionWithArgs(nullptr, pFunc, apSystem, result, aObject, aSlot, aItemID);
+        break;
+    case 9:
+        called = Red::Detail::CallFunctionWithArgs(nullptr, pFunc, apSystem, result, aObject, aSlot, aItemID,
+                                                   highPriority, nullptr, renderingPlane, keepWorldTransform,
+                                                   ignoreRestrictions, aGarmentAppearance);
+        break;
+    }
+
+    if (!called)
+        spdlog::warn("[Appearance] TransactionSystem.AddItemToSlot refused the call - see its logged signature");
+
+    return called && result;
+}
+
 void AddItems(Red::Handle<Red::game::Object> & object, Red::DynArray<Red::TweakDBID> const & items, game::ui::CharacterCustomizationState const * state)
 {
     auto system = Red::GetGameSystem<Red::game::ITransactionSystem>();
@@ -223,24 +316,10 @@ void AddItems(Red::Handle<Red::game::Object> & object, Red::DynArray<Red::TweakD
 
         appearanceName = appearance.c_str();
 
-        auto params = Red::game::ItemModParams();
-        params.quantity = 1;
-        params.itemID = itemID;
-
-        auto context = Red::game::AddItemToSlotContext();
-        context.object = object.instance;
-        context.slotID = placementSlot;
-        context.itemID = itemID;
-        // context.itemID.flags |= 1;
-        // context.ignoreRestrictions = 1;
-        context.renderingPlane = Red::ERenderingPlane::RPl_Scene;
-        // context.renderingPlane = Red::ERenderingPlane::RPl_Weapon;
-        context.garmentAppearanceName = appearanceName;
-
-        auto given = system->GiveItem(*object, params);
+        auto given = GiveItemByName(system, object, itemID, 1);
         if (given)
         {
-            auto added = system->AddItemToSlot(context);
+            auto added = AddItemToSlotByName(system, object, placementSlot, itemID, appearanceName);
             if (!added)
             {
                 // Previously logged nothing identifying - every failure looked the same
