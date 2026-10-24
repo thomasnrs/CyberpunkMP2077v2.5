@@ -50,5 +50,13 @@ if ($backup) {
 $template = Join-Path $env:USERPROFILE 'Saved Games\CD Projekt Red\Cyberpunk 2077\MultiplayerStart'
 if (Test-Path $template) { Remove-Item $template -Recurse -Force }
 
+# Atalho e atualizador. A chave (chave.txt) fica: e ela que liga este PC ao personagem
+# salvo no servidor, e reinstalar sem ela seria comecar do zero.
+Remove-Item (Join-Path ([Environment]::GetFolderPath('Desktop')) 'Jogar Night City Online.lnk') -Force -ErrorAction SilentlyContinue
+$appDir = Join-Path $env:APPDATA 'NightCityOnline'
+foreach ($name in 'Atualizar.ps1', 'Jogar.bat', 'jogo.txt', 'versao.txt') {
+    Remove-Item (Join-Path $appDir $name) -Force -ErrorAction SilentlyContinue
+}
+
 Write-Host "  Night City Online removido ($($files.Count) arquivos)." -ForegroundColor Green
 Write-Host '  Lembre de apagar as opcoes de inicializacao na Steam.'

@@ -20,8 +20,10 @@ INSTALAR
      (ele ja copia para a area de transferencia).
 
 JOGAR
-  Abra o jogo pela Steam. No menu aparecem CONNECT e CREATE NEW CHARACTER.
-  O personagem fica salvo no servidor, nao no seu PC.
+  Use o atalho "Jogar Night City Online" na area de trabalho. Ele confere se
+  saiu versao nova do mod, instala sozinho se tiver, e abre o jogo.
+  No menu aparecem CONNECT e CREATE NEW CHARACTER.
+  O personagem fica salvo no servidor, ligado a sua chave (--discord-token=...).
 
 SEUS SAVES
   O instalador nao mexe nos seus saves. Com as opcoes de inicializacao do

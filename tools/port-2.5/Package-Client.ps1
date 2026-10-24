@@ -14,6 +14,8 @@
 param(
     [switch]$Build,
     [string]$ServerIp,
+    # Release tag this package is published under; the updater compares against it.
+    [string]$Tag,
     [string]$Work = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 )
 
@@ -121,6 +123,7 @@ foreach ($body in 'feminino', 'masculino') {
 
 Copy-Item (Join-Path $PSScriptRoot 'payload\*') $stage
 if ($ServerIp) { $ServerIp | Set-Content (Join-Path $stage 'servidor.txt') -Encoding ascii }
+if ($Tag) { $Tag | Set-Content (Join-Path $stage 'release.txt') -Encoding ascii }
 
 $commit = git -C $repo rev-parse --short HEAD
 $dirty = if (git -C $repo status --porcelain -- code vendor) { '-modificado' } else { '' }
