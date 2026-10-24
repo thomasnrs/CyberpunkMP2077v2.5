@@ -92,9 +92,12 @@ Copy-Item (Join-Path $here "saves\MultiplayerStart-$Corpo") $templateDir -Recurs
 $(if ($Corpo -eq 'masculino') { 'male' } else { 'female' }) | Set-Content (Join-Path $templateDir '.bodytype') -NoNewline -Encoding ascii
 Write-Host "  Save modelo ($Corpo) instalado. Seus outros saves nao foram tocados." -ForegroundColor Green
 
-# Opcoes de inicializacao.
-if (-not $ServidorIp) { $ServidorIp = Read-Host '  IP do servidor (o IP do Tailscale de quem hospeda; Enter = este PC)' }
-if (-not $ServidorIp) { $ServidorIp = '127.0.0.1' }
+# Opcoes de inicializacao. servidor.txt vem preenchido por quem gerou o pacote.
+$defaultIp = '127.0.0.1'
+$serverFile = Join-Path $here 'servidor.txt'
+if (Test-Path $serverFile) { $defaultIp = (Get-Content $serverFile -TotalCount 1).Trim() }
+if (-not $ServidorIp) { $ServidorIp = Read-Host "  IP do servidor (Enter = $defaultIp)" }
+if (-not $ServidorIp) { $ServidorIp = $defaultIp }
 $options = "--online --ip=$ServidorIp --port=11778 -skipStartScreen"
 
 Write-Host ''

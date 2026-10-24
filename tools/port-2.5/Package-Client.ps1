@@ -9,10 +9,11 @@
   Pinned downloads (cached in ..\.nco-cache): redscript, Input Loader, the ArchiveXL
   release (bundle/scripts are unchanged by its 2.5 PR) and the two template saves.
 
-  Usage:  .\tools\port-2.5\Package-Client.ps1 [-Build]
+  Usage:  .\tools\port-2.5\Package-Client.ps1 [-Build] [-ServerIp <tailscale ip of the host>]
 #>
 param(
     [switch]$Build,
+    [string]$ServerIp,
     [string]$Work = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 )
 
@@ -119,6 +120,7 @@ foreach ($body in 'feminino', 'masculino') {
 }
 
 Copy-Item (Join-Path $PSScriptRoot 'payload\*') $stage
+if ($ServerIp) { $ServerIp | Set-Content (Join-Path $stage 'servidor.txt') -Encoding ascii }
 
 $commit = git -C $repo rev-parse --short HEAD
 $dirty = if (git -C $repo status --porcelain -- code vendor) { '-modificado' } else { '' }
