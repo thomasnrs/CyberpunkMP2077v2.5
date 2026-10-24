@@ -360,6 +360,12 @@ void NetworkService::AuthorizeSpawn()
     m_spawnAuthorized = true;
 }
 
+void NetworkService::HoldSpawn()
+{
+    m_spawnAuthorized = false;
+    m_spawnDeferred = true;
+}
+
 void NetworkService::SendSpawnCharacterRequest()
 {
     /*

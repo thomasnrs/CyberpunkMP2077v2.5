@@ -81,6 +81,10 @@ public:
     // world.
     bool IsSpawnDeferred() const { return m_spawnDeferred; }
 
+    // Back at the selector: the server has released our puppet, so the next PLAY owes a
+    // fresh spawn instead of assuming the one sent at connect still stands.
+    void HoldSpawn();
+
 private:
 
     static ScratchAllocator& GetScratch();

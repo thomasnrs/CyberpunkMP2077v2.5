@@ -2050,6 +2050,13 @@ void NetworkWorldSystem::LeaveWorld()
     client::LeaveWorldRequest request;
     service->Send(request);
 
+    // The server destroyed that puppet. Keeping its id made every movement update a
+    // "move invalid entity" warning on the server, and keeping the spawn marked as sent made
+    // EnterWorld() skip the spawn on the next PLAY - the player stood in the world with no
+    // puppet on the server, invisible to everyone and deaf to chat.
+    m_remotePlayerId = std::nullopt;
+    service->HoldSpawn();
+
     spdlog::info("[Character] told the server we left the world (back at the selector)");
 }
 
