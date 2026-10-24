@@ -40,6 +40,8 @@ public class MpTakeDriverSeatCallback extends DelayCallback {
 
 public native class NetworkWorldSystem extends IGameSystem {
     public native func Connect() -> Void;
+    // The main menu's connect: the spawn is held until PLAY however the scene looks.
+    public native func ConnectFromMenu() -> Void;
     public native func Disconnect() -> Void;
     public native func RequestJoin() -> Void;
 

@@ -332,14 +332,18 @@ void NetworkService::HandleAuthentication(const PacketEvent<server::Authenticati
  * So the answer is taken once, at the press, and kept. A menu connect stays a menu connect
  * however fast the machine is.
  */
-void NetworkService::CaptureSpawnIntent()
+void NetworkService::CaptureSpawnIntent(bool aFromMenu)
 {
     const auto system = Red::GetGameSystem<Game::PlayerSystem>();
     Red::Handle<Red::GameObject> player;
 
-    if (system)
+    if (system && !aFromMenu)
         system->GetLocalPlayerControlledGameObject(player);
 
+    // aFromMenu is the menu saying so outright. On 2.5 the main menu's backdrop scene has a
+    // player object of its own, so "is there a player" answered yes on the menu: the spawn
+    // went out at once, and the server's teleport moved the menu puppet into a city that was
+    // not loaded - both players fell through an empty world after CONNECT.
     m_spawnAuthorized = static_cast<bool>(player);
 
     spdlog::info("[Spawn] connect asked for from {} - the spawn {}",

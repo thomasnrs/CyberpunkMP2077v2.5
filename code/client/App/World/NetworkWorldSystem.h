@@ -45,6 +45,9 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     void OnInitialize(const RED4ext::JobHandle& aJob) override;
 
     void Connect();
+    // The main menu's CONNECT: always holds the spawn until PLAY, without asking whether a
+    // player object exists (the 2.5 menu scene has one).
+    void ConnectFromMenu();
     void Disconnect();
     void OnConnected();
     void OnDisconnected(Client::EDisconnectReason);
@@ -790,6 +793,7 @@ private:
     mutable Red::CBaseFunction* m_pPsmGetInt{nullptr};
     bool m_ready{false};
     bool m_joinRequested{false};
+    bool m_connectingFromMenu{false};
 
     // The account's character, as reported at sign-in. See SetCharacterStatus.
     bool m_characterStatusKnown{false};
@@ -909,6 +913,7 @@ void InstallCrashLogger();
 RTTI_DEFINE_CLASS(NetworkWorldSystem, { 
     RTTI_ALIAS("CyberpunkMP.World.NetworkWorldSystem");
     RTTI_METHOD(Connect);
+    RTTI_METHOD(ConnectFromMenu);
     RTTI_METHOD(Disconnect);
     RTTI_METHOD(RequestJoin);
     RTTI_METHOD(MarkNewCharacter);

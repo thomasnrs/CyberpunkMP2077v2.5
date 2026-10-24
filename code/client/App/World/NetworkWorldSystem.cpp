@@ -3886,9 +3886,16 @@ void NetworkWorldSystem::Connect()
     // at the moment they asked to connect, which is what decides whether authentication is
     // allowed to spawn them - see CaptureSpawnIntent. Asked afterwards it becomes a race
     // against whatever else the press set in motion.
-    service->CaptureSpawnIntent();
+    service->CaptureSpawnIntent(m_connectingFromMenu);
 
     service->Connect(address);
+}
+
+void NetworkWorldSystem::ConnectFromMenu()
+{
+    m_connectingFromMenu = true;
+    Connect();
+    m_connectingFromMenu = false;
 }
 
 void NetworkWorldSystem::SetConnectionDenial(const uint32_t aCode, const std::string& acMessage,
