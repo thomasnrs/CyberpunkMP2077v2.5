@@ -922,6 +922,33 @@ void HookIdleController_SetAnimation(Game::Controller* apController, AnimationDa
             // in the log is the evidence.
             spdlog::info("[Interpolation] idle controller (re)entered for puppet {:x} - attaching multi controller", pOwner->id.hash);
 
+            // The multi controller copies the idle controller's vtable layout slot by slot.
+            // Log the engine's own idle vtable once - how many entries point into the game's
+            // code, and where its first slots go - so a patch that moved the slots can be
+            // read off the log instead of guessed from a puppet that silently stands still.
+            static bool s_idleVtableLogged = false;
+            if (!s_idleVtableLogged)
+            {
+                s_idleVtableLogged = true;
+                const auto module = reinterpret_cast<uintptr_t>(GetModuleHandleW(nullptr));
+                const auto* pDos = reinterpret_cast<const IMAGE_DOS_HEADER*>(module);
+                const auto* pNt = reinterpret_cast<const IMAGE_NT_HEADERS*>(module + pDos->e_lfanew);
+                const auto imageEnd = module + pNt->OptionalHeader.SizeOfImage;
+                const auto* pVtable = *reinterpret_cast<const uintptr_t* const*>(apController);
+
+                uint32_t count = 0;
+                std::string slots;
+                while (count < 64 && pVtable[count] > module && pVtable[count] < imageEnd)
+                {
+                    if (count < 20)
+                        slots += std::format("{:X}:+{:X} ", count * 8, pVtable[count] - module);
+                    ++count;
+                }
+                spdlog::info("[Interpolation] engine idle controller vtable at +{:X}: {} entries (the multi controller "
+                             "declares 23) - {}",
+                             reinterpret_cast<uintptr_t>(pVtable) - module, count, slots);
+            }
+
             // The kMulti guard above is evaluated on the ANIMATION thread while the attach
             // below happens later on the MAIN thread, so every animation frame in that gap
             // queues another attach for the same move component. Harmless - the second one

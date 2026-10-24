@@ -8,6 +8,19 @@
 
 #include "States/Spawning.h"
 
+namespace
+{
+// Which controller slots the engine actually calls, logged once each. The vtable below is an
+// engine ABI copied by index from the idle controller; if a patch moves those slots, the
+// remote puppet stands still without any error, and this is the only way to see it.
+void TraceSlot(uint32_t aSlot, const char* apName)
+{
+    static std::atomic<uint64_t> s_seen{0};
+    const uint64_t bit = 1ull << (aSlot / 8);
+    if ((s_seen.fetch_or(bit) & bit) == 0)
+        spdlog::info("[MultiMovement] engine called slot 0x{:X} ({}) for the first time", aSlot, apName);
+}
+}
 Core::RawFunc<316482401, void (*)(Red::AnimationControllerComponent* AnimationController, Red::CName Name, Red::Handle<Red::anim::AnimFeature> Feature)> ApplyFeature;
 
 RED4ext::Memory::PoolAI_Movement* MultiMovementController::GetMemoryPool()
@@ -19,10 +32,12 @@ MultiMovementController::~MultiMovementController() = default;
 
 void MultiMovementController::PreTick(float delta)
 {
+    TraceSlot(0x10, "PreTick");
 }
 
 void MultiMovementController::Tick(float delta)
 {
+    TraceSlot(0x18, "Tick");
     if (!m_pState)
         return;
 
@@ -38,6 +53,7 @@ void MultiMovementController::Tick(float delta)
 
 void MultiMovementController::GetDeltaTransform(Red::Vector4& positionDelta, Red::Quaternion& rotationDelta)
 {
+    TraceSlot(0x20, "GetDeltaTransform");
     // Runs every animation frame on the ANIMATION thread, and mounting a puppet into a
     // vehicle REPARENTS its entity - the placement chain below can go away mid-seat.
     // These were unchecked dereferences until a driver's game died ~25s after a remote
@@ -84,21 +100,25 @@ void MultiMovementController::GetDeltaTransform(Red::Vector4& positionDelta, Red
 
 void MultiMovementController::sub_28(bool& unk)
 {
+    TraceSlot(0x28, "sub_28");
     unk = false;
 }
 
 void MultiMovementController::sub_30(Red::Vector4& positionDelta, Red::Quaternion& rotationDelta)
 {
+    TraceSlot(0x30, "sub_30");
     
 }
 
 void MultiMovementController::sub_38(Red::Vector4& position, Red::Quaternion& rotation, bool& unk1, bool& unk2)
 {
+    TraceSlot(0x38, "sub_38");
     
 }
 
 void MultiMovementController::SendAnimationParameters(float delta, Red::Vector4& position, Red::Quaternion& orientation)
 {
+    TraceSlot(0x40, "SendAnimationParameters");
     if (!m_pState)
         return;
 
@@ -127,26 +147,31 @@ Red::CName MultiMovementController::GetName() const
 
 bool MultiMovementController::sub_60()
 {
+    TraceSlot(0x60, "sub_60");
     return true;
 }
 
 void MultiMovementController::sub_68()
 {
+    TraceSlot(0x68, "sub_68");
     
 }
 
 void MultiMovementController::sub_70()
 {
+    TraceSlot(0x70, "sub_70");
     
 }
 
 void MultiMovementController::Mount(RED4ext::move::Component& movable, Red::Handle<Red::ent::Entity> owner)
 {
+    TraceSlot(0x78, "Mount");
     
 }
 
 void MultiMovementController::Attach(Red::move::Component& movable)
 {
+    TraceSlot(0x80, "Attach");
     if (!movable.owner || !movable.owner->placedComponent)
     {
         spdlog::warn("[MultiMovement] Attach skipped with missing placement chain");
@@ -169,6 +194,7 @@ void MultiMovementController::Attach(Red::move::Component& movable)
 
 void MultiMovementController::Detach(Red::move::Component& movable)
 {
+    TraceSlot(0x88, "Detach");
     m_animationDriver.Detach();
 
     m_pState.reset();
@@ -178,6 +204,7 @@ void MultiMovementController::Detach(Red::move::Component& movable)
 
 void MultiMovementController::GetAnimationParameters(AnimationData& animationData)
 {
+    TraceSlot(0x90, "GetAnimationParameters");
     if (!m_pState)
         return;
 
