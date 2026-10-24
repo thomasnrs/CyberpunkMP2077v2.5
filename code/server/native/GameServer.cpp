@@ -1020,9 +1020,14 @@ void GameServer::HandleAuthentication(const PacketEvent<client::AuthenticationRe
         }
         const std::string localId = std::format("local-{:016x}", hash);
 
-        spdlog::info("Authorize connection from {} as {} (Discord verification disabled)", username, localId);
+        // Discord.OwnerId may name a local id, so a private server still has an owner who can
+        // run staff commands (/tp and the like). Roles need Discord and do not apply here.
+        const auto level = m_config.Discord.ResolveLevel(localId, {});
 
-        AdmitPlayer(aRequest.ConnectionId, username, localId, EPermissionLevel::kPlayer, token);
+        spdlog::info("Authorize connection from {} as {} - {} (Discord verification disabled)", username, localId,
+                     ToString(level));
+
+        AdmitPlayer(aRequest.ConnectionId, username, localId, level, token);
         return;
     }
 
