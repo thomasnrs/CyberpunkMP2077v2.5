@@ -98,7 +98,25 @@ $serverFile = Join-Path $here 'servidor.txt'
 if (Test-Path $serverFile) { $defaultIp = (Get-Content $serverFile -TotalCount 1).Trim() }
 if (-not $ServidorIp) { $ServidorIp = Read-Host "  IP do servidor (Enter = $defaultIp)" }
 if (-not $ServidorIp) { $ServidorIp = $defaultIp }
-$options = "--online --ip=$ServidorIp --port=11778 -skipStartScreen"
+
+# Conta no servidor sem Discord: o apelido aparece para os outros, a chave e a sua senha.
+# Mesma chave = mesmo personagem salvo, entao ela fica guardada neste PC e e reaproveitada.
+$keyDir = Join-Path $env:APPDATA 'NightCityOnline'
+$keyFile = Join-Path $keyDir 'chave.txt'
+if (Test-Path $keyFile) {
+    $key = (Get-Content $keyFile -TotalCount 1).Trim()
+} else {
+    $chars = 'abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+    $bytes = New-Object byte[] 24
+    [Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes)
+    $key = -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
+    New-Item -ItemType Directory -Force $keyDir | Out-Null
+    $key | Set-Content $keyFile -Encoding ascii
+}
+$nick = (Read-Host '  Seu apelido no jogo (sem espacos)') -replace '\s', '_'
+if (-not $nick) { $nick = $env:USERNAME -replace '\s', '_' }
+
+$options = "--online --ip=$ServidorIp --port=11778 -skipStartScreen --discord-name=$nick --discord-token=$key"
 
 Write-Host ''
 Write-Host '  Ultimo passo, na Steam:' -ForegroundColor Cyan
@@ -108,6 +126,8 @@ Write-Host ''
 Write-Host "    $options" -ForegroundColor White
 Write-Host ''
 Set-Clipboard -Value $options -ErrorAction SilentlyContinue
+Write-Host "  A parte --discord-token=... e a sua senha no servidor (guardada em $keyFile)."
+Write-Host '  Nao passe ela para ninguem: quem tiver a chave entra como voce.'
 Write-Host '  Para jogar single player normal, apague essas opcoes.'
 Write-Host '  Para remover tudo, rode Desinstalar.bat.'
 Write-Host ''

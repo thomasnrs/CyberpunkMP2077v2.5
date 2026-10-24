@@ -1004,11 +1004,25 @@ void GameServer::HandleAuthentication(const PacketEvent<client::AuthenticationRe
     if (!m_config.Discord.Enabled)
     {
         const std::string username = aRequest.get_username().c_str();
+        const std::string token = aRequest.get_token().c_str();
 
-        spdlog::info("Authorize connection from {} (Discord verification disabled)", username);
+        // A private server without Discord still needs a durable account, or no character is
+        // ever stored and every join is a stranger. The token the player passes
+        // (--discord-token=<anything>) becomes a personal key: the same key is the same
+        // account. Only its hash is kept. "test" is what a client sends when it was given no
+        // token, so that case falls back to the name, which is enough for one person per name.
+        const std::string key = token.empty() || token == "test" ? "name:" + username : "key:" + token;
+        uint64_t hash = 0xcbf29ce484222325ull;
+        for (const unsigned char c : key)
+        {
+            hash ^= c;
+            hash *= 0x100000001b3ull;
+        }
+        const std::string localId = std::format("local-{:016x}", hash);
 
-        AdmitPlayer(aRequest.ConnectionId, username, {}, EPermissionLevel::kPlayer,
-                    aRequest.get_token().c_str());
+        spdlog::info("Authorize connection from {} as {} (Discord verification disabled)", username, localId);
+
+        AdmitPlayer(aRequest.ConnectionId, username, localId, EPermissionLevel::kPlayer, token);
         return;
     }
 

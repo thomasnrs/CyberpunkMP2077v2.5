@@ -216,11 +216,14 @@ static bool AddItemToSlotByName(Red::game::ITransactionSystem* apSystem, Red::Ha
         return false;
 
     // The vanilla script order after (obj, slotID, itemID): highPriority, itemObject,
-    // renderingPlane, keepWorldTransform, ignoreRestrictions, garmentAppearanceName.
+    // renderingPlane, keepWorldTransform, ignoreRestrictions, garmentAppearanceName, and on
+    // 2.5 also appearanceItem and dontCacheEquippedItem.
     bool highPriority = true;
     auto renderingPlane = Red::ERenderingPlane::RPl_Scene;
     bool keepWorldTransform = false;
     bool ignoreRestrictions = false;
+    Red::ItemID appearanceItem{};
+    bool dontCacheEquippedItem = true;
 
     bool result = false;
     bool called = false;
@@ -233,6 +236,12 @@ static bool AddItemToSlotByName(Red::game::ITransactionSystem* apSystem, Red::Ha
         called = Red::Detail::CallFunctionWithArgs(nullptr, pFunc, apSystem, result, aObject, aSlot, aItemID,
                                                    highPriority, nullptr, renderingPlane, keepWorldTransform,
                                                    ignoreRestrictions, aGarmentAppearance);
+        break;
+    case 11:
+        called = Red::Detail::CallFunctionWithArgs(nullptr, pFunc, apSystem, result, aObject, aSlot, aItemID,
+                                                   highPriority, nullptr, renderingPlane, keepWorldTransform,
+                                                   ignoreRestrictions, aGarmentAppearance, appearanceItem,
+                                                   dontCacheEquippedItem);
         break;
     }
 
