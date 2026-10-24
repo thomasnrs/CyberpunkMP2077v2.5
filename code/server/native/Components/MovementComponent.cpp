@@ -4,6 +4,7 @@
 #include "PlayerComponent.h"
 #include "AttachmentComponent.h"
 #include "AuthorityComponent.h"
+#include "Game/Level.h"
 
 #include <cmath>
 
@@ -33,7 +34,11 @@ constexpr float kReducedRateRange = 600.f;
 // ~7 and ~2 updates a second, which is enough to keep a distant puppet honest.
 constexpr uint32_t kReducedRateDivisor = 4;
 constexpr uint32_t kDistantRateDivisor = 16;
-constexpr float kWorldCellSize = 60000.f;
+// The advertised grid (Level::kCellSize, 6000), never a literal. This was 60000: the client
+// checks every snapshot's cell against the size the server announced, so the two only agreed
+// while both coordinates stayed inside +-6000 - anyone farther out had every movement update
+// dropped as map-invalid, and stood frozen on everyone else's screen.
+constexpr float kWorldCellSize = Level::kCellSize;
 
 int32_t ToSnapshotCell(float aCoordinate)
 {

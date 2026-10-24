@@ -6,13 +6,16 @@
 #include "AuthorityComponent.h"
 
 #include "GameServer.h"
+#include "Game/Level.h"
 
 #include <cmath>
 
 namespace
 {
 constexpr uint32_t kWorldRevision = 1;
-constexpr float kWorldCellSize = 60000.f;
+// The advertised grid, not a literal - see the note in MovementComponent.cpp. At 60000 every
+// vehicle outside +-6000 was dropped by clients as map-invalid.
+constexpr float kWorldCellSize = Level::kCellSize;
 
 int32_t ToSnapshotCell(float aCoordinate)
 {
