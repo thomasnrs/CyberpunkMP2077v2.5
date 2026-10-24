@@ -84,6 +84,26 @@ void MultiMovementController::GetDeltaTransform(Red::Vector4& positionDelta, Red
     positionDelta = {m_position.X - position.X, m_position.Y - position.Y, m_position.Z - position.Z, 0.f};
     rotationDelta = Game::ToRed(glm::quat(angles));
 
+    // Target, current and the delta handed back, every five seconds per controller. If the
+    // target never changes, interpolation is not feeding SetTransform; if it changes and the
+    // delta is right but the puppet stays put, the engine is ignoring the delta.
+    {
+        static std::mutex s_lock;
+        static std::unordered_map<const void*, std::chrono::steady_clock::time_point> s_last;
+        std::lock_guard lock(s_lock);
+        auto& last = s_last[this];
+        const auto now = std::chrono::steady_clock::now();
+        if (now - last >= std::chrono::seconds(5))
+        {
+            last = now;
+            spdlog::info("[MultiMovement] target ({:.1f}, {:.1f}, {:.1f}) current ({:.1f}, {:.1f}, {:.1f}) delta {:.2f}m speed {:.1f}",
+                         m_position.X, m_position.Y, m_position.Z, pos.x, pos.y, pos.z,
+                         std::sqrt(positionDelta.X * positionDelta.X + positionDelta.Y * positionDelta.Y +
+                                   positionDelta.Z * positionDelta.Z),
+                         m_speed);
+        }
+    }
+
     // Interpolation stops feeding SetTransform while a puppet is seated (AttachedComponent
     // gates it), so m_position freezes at the mount spot. If the engine still asks this
     // controller for deltas while the car drives away, the answer grows without bound -

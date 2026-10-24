@@ -285,6 +285,36 @@ static void TraceDriverless(flecs::entity aEntity, const EntityComponent& aEntit
     }
 }
 
+// Which way InterpolateEntity leaves, per remote puppet, summarised every five seconds.
+// Remote players can receive and accept every snapshot yet stand still; each early exit
+// below is silent, so this is what says which one is taken.
+static void NoteInterpolationPath(uint64_t aId, const char* apPath)
+{
+    struct Counts
+    {
+        std::map<std::string, uint32_t> Paths;
+        std::chrono::steady_clock::time_point Since = std::chrono::steady_clock::now();
+    };
+    static std::mutex s_lock;
+    static std::unordered_map<uint64_t, Counts> s_counts;
+
+    std::lock_guard lock(s_lock);
+    auto& counts = s_counts[aId];
+    ++counts.Paths[apPath];
+
+    const auto now = std::chrono::steady_clock::now();
+    if (now - counts.Since < std::chrono::seconds(5))
+        return;
+
+    std::string summary;
+    for (const auto& [path, count] : counts.Paths)
+        summary += std::format("{}={} ", path, count);
+    spdlog::info("[Interpolation] puppet {:x} paths over 5s: {}", aId, summary);
+
+    counts.Paths.clear();
+    counts.Since = now;
+}
+
 void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComponent, InterpolationComponent& aInterpolation, float aSimulationDelay, Red::vehicle::IMoveSystem* apMoveSystem)
 {
     // Render time, in the integer domain the ticks actually live in.
@@ -347,7 +377,10 @@ void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComp
 
     // Nothing to work from yet - the puppet has spawned but no movement has arrived.
     if (!aInterpolation.HasPrevious)
+    {
+        NoteInterpolationPath(aEntityComponent.Id.hash, "no-previous");
         return;
+    }
 
     // The stub gate predates driver puppets and only means anything on the legacy
     // path - player-record entities may never get a stub at all, and this silently
@@ -388,6 +421,7 @@ void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComp
             // once, which means this gate was not what froze it. The warning stays,
             // because the gate being silent is what made it a suspect for a whole
             // evening in the first place.
+            NoteInterpolationPath(aEntityComponent.Id.hash, "no-stub");
             return;
         }
     }
@@ -395,6 +429,7 @@ void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComp
     if (aEntity.has<AttachedComponent>())
     {
         TraceDriverless(aEntity, aEntityComponent, aInterpolation, renderTick, "exit: attached");
+        NoteInterpolationPath(aEntityComponent.Id.hash, "attached");
         return;
     }
 
@@ -414,6 +449,7 @@ void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComp
         {
             TraceDriverless(aEntity, aEntityComponent, aInterpolation, renderTick,
                             "exit: extrapolation window closed");
+            NoteInterpolationPath(aEntityComponent.Id.hash, "starved");
             return;
         }
 
@@ -464,7 +500,10 @@ void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComp
         {
             const auto pos = Red::Vector4{guessed.x, guessed.y, guessed.z, 0.f};
             aEntityComponent.Controller->SetTransform(pos, first.Rotation.z, first.Velocity, first.Locomotion);
+            NoteInterpolationPath(aEntityComponent.Id.hash, "extrapolated-controller");
         }
+        else if (!aEntityComponent.IsVehicle)
+            NoteInterpolationPath(aEntityComponent.Id.hash, "extrapolated-no-controller");
         return;
     }
 
@@ -599,12 +638,18 @@ void InterpolateEntity(flecs::entity aEntity, const EntityComponent& aEntityComp
             // The band state comes from the sample AHEAD - it is where the mover is
             // heading, and it is the fresher of the two.
             DriveEntity(*pDriver, aEntityComponent, position, direction, speed, second.Locomotion, frameDelta);
+            NoteInterpolationPath(aEntityComponent.Id.hash, "driver");
         }
         else if (aEntityComponent.Controller)
         {
             // Legacy path: the engine-attached controller (NPC-record puppets).
             const auto pos = Red::Vector4{position.x, position.y, position.z, 0.f};
             aEntityComponent.Controller->SetTransform(pos, direction, speed, second.Locomotion);
+            NoteInterpolationPath(aEntityComponent.Id.hash, "controller");
+        }
+        else
+        {
+            NoteInterpolationPath(aEntityComponent.Id.hash, "no-controller");
         }
     }
 
