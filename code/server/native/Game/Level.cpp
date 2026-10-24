@@ -286,6 +286,17 @@ void Level::AddPlayer(flecs::entity aEntity) noexcept
             load.set_rotation(aMovementComponent.Rotation.z);
             load.set_tweak_id(aVehicleComponent.TweakDBID);
 
+            // The same map contract as the live spawn in VehicleComponent.cpp. Without the
+            // revision and cell the client rejects the load as map-invalid, so a late joiner
+            // got no cars at all - and anyone seated in one was mounted to nothing, invisible.
+            const auto cell = ToCell(aMovementComponent.Position);
+            load.set_world_revision(1);
+            load.set_cell_x(cell.x);
+            load.set_cell_y(cell.y);
+            load.set_sequence(aMovementComponent.Sequence);
+            if (const auto* pAuthority = aVehicle.get<AuthorityComponent>())
+                load.set_authority_epoch(pAuthority->Epoch);
+
             GServer->Send(pPlayerComponent->Connection, load);
         });
 

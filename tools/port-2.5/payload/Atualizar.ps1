@@ -21,6 +21,11 @@ function Start-Game {
 Write-Host ''
 Write-Host '  Night City Online - verificando atualizacao...' -ForegroundColor Cyan
 
+# Os logs da sessao anterior vao para o servidor antes de tudo, para quem hospeda ver o que
+# aconteceu sem precisar pedir.
+$sendLogs = Join-Path $home_ 'EnviarLogsServidor.ps1'
+if (Test-Path $sendLogs) { & $sendLogs }
+
 try {
     $release = Invoke-RestMethod "https://api.github.com/repos/$repo/releases/latest" -Headers @{ 'User-Agent' = 'NightCityOnline-updater' } -TimeoutSec 20
 } catch {
@@ -97,10 +102,13 @@ try {
     }
 
     # O proprio atualizador e os scripts que vem no pacote.
-    foreach ($script in 'Atualizar.ps1', 'Desinstalar.ps1', 'Desinstalar.bat', 'EnviarLogs.ps1', 'EnviarLogs.bat') {
+    foreach ($script in 'Atualizar.ps1', 'Desinstalar.ps1', 'Desinstalar.bat', 'EnviarLogs.ps1', 'EnviarLogs.bat', 'EnviarLogsServidor.ps1') {
         $new = Join-Path $work "x\$script"
         if (Test-Path $new) { Copy-Item $new (Join-Path $home_ $script) -Force }
     }
+    # O endereco do servidor que o pacote traz, para o envio de logs.
+    $newServer = Join-Path $work 'x\servidor.txt'
+    if (Test-Path $newServer) { Copy-Item $newServer (Join-Path $home_ 'servidor.txt') -Force }
 
     $release.tag_name | Set-Content $installedFile -Encoding ascii
     Write-Host "  Atualizado para $($release.tag_name)." -ForegroundColor Green

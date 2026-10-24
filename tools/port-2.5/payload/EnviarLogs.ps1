@@ -37,6 +37,9 @@ $zip = Join-Path ([Environment]::GetFolderPath('Desktop')) ("logs-nightcity-{0}.
 Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
 Remove-Item $stage -Recurse -Force
 
+$sendLogs = Join-Path $home_ 'EnviarLogsServidor.ps1'
+if (Test-Path $sendLogs) { & $sendLogs -GameDir $gameDir }
+
 Write-Host ''
 Write-Host "  Pronto: $zip" -ForegroundColor Green
 Write-Host '  Mande esse arquivo para quem hospeda o servidor.'

@@ -120,9 +120,10 @@ $options = "--online --ip=$ServidorIp --port=11778 -skipStartScreen --discord-na
 
 # Atualizador: fica em %APPDATA%\NightCityOnline com um atalho na area de trabalho que
 # atualiza (se houver versao nova) e abre o jogo.
-foreach ($script in 'Atualizar.ps1', 'Jogar.bat', 'Desinstalar.ps1', 'Desinstalar.bat', 'EnviarLogs.ps1', 'EnviarLogs.bat') {
+foreach ($script in 'Atualizar.ps1', 'Jogar.bat', 'Desinstalar.ps1', 'Desinstalar.bat', 'EnviarLogs.ps1', 'EnviarLogs.bat', 'EnviarLogsServidor.ps1') {
     Copy-Item (Join-Path $here $script) (Join-Path $keyDir $script) -Force
 }
+$ServidorIp | Set-Content (Join-Path $keyDir 'servidor.txt') -Encoding ascii
 $GameDir | Set-Content (Join-Path $keyDir 'jogo.txt') -Encoding utf8
 $releaseFile = Join-Path $here 'release.txt'
 if (Test-Path $releaseFile) { Copy-Item $releaseFile (Join-Path $keyDir 'versao.txt') -Force }
