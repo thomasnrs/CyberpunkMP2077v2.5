@@ -1,4 +1,19 @@
-# Night City Online
+# Night City Online - Cyberpunk 2077 2.5 port
+
+> **This repository ports Night City Online to Cyberpunk 2077 patch 2.5** (Edgerunners 2).
+> The fork it is based on targets 2.31, and that build does not start on 2.5.
+>
+> - What changed, which dependencies are built from which PRs, and what is still unverified:
+>   [docs/PORT-2.5.md](docs/PORT-2.5.md)
+> - Player package (game-folder overlay + installer): see the
+>   [releases](https://github.com/thomasnrs/CyberpunkMP2077v2.5/releases) of this repository.
+> - The launcher and release links below belong to the original fork and target 2.31.
+>
+> Based on [CyberpunkMP](https://github.com/tiltedphoques/CyberpunkMP) by Tilted Phoques SRL
+> and the [Night City Online fork](https://github.com/ofmiceandcam98-eng/CyberpunkMP), under
+> the license in [LICENSE.md](LICENSE.md).
+
+---
 
 [![Latest release](https://img.shields.io/github/v/release/ofmiceandcam98-eng/CyberpunkMP?label=launcher&color=e5484d)](https://github.com/ofmiceandcam98-eng/CyberpunkMP/releases/latest)
 [![Build windows](https://github.com/ofmiceandcam98-eng/CyberpunkMP/actions/workflows/windows.yml/badge.svg)](https://github.com/ofmiceandcam98-eng/CyberpunkMP/actions/workflows/windows.yml)
