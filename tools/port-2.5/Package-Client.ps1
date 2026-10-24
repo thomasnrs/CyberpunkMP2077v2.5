@@ -116,9 +116,18 @@ $modTarget = Join-Path $game 'red4ext\plugins\zzzCyberpunkMP'
 Copy-Item $mod $modTarget -Recurse
 Remove-Item (Join-Path $modTarget 'logs') -Recurse -Force -ErrorAction SilentlyContinue
 
-# Template saves, one per body type.
+# Template saves, one per body type. The fork's own templates are Phantom Liberty saves, which
+# a player without the expansion cannot load (PLAY drops back to the menu) or lands in a broken
+# area, so base-game saves in ..\nco-templates\<body> take precedence when present.
 foreach ($body in 'feminino', 'masculino') {
-    Expand-Archive (Get-Cached $body) (Join-Path $stage "saves\MultiplayerStart-$body")
+    $target = Join-Path $stage "saves\MultiplayerStart-$body"
+    $local = Join-Path $Work "nco-templates\$body"
+    if (Test-Path (Join-Path $local 'sav.dat')) {
+        Copy-Item $local $target -Recurse
+    } else {
+        Write-Host "  aviso: sem nco-templates\$body - usando o modelo do fork (Phantom Liberty)" -ForegroundColor Yellow
+        Expand-Archive (Get-Cached $body) $target
+    }
 }
 
 Copy-Item (Join-Path $PSScriptRoot 'payload\*') $stage

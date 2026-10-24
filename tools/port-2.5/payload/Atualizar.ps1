@@ -75,6 +75,18 @@ try {
     }
     $listed | Sort-Object | Set-Content $manifest -Encoding utf8
 
+    # O save modelo do mesmo corpo que o jogador escolheu na instalacao. Os personagens ficam
+    # no servidor, entao trocar o modelo nao perde nada.
+    $template = Join-Path $env:USERPROFILE 'Saved Games\CD Projekt Red\Cyberpunk 2077\MultiplayerStart'
+    $bodyFile = Join-Path $template '.bodytype'
+    $body = if ((Test-Path $bodyFile) -and (Get-Content $bodyFile -TotalCount 1) -eq 'male') { 'masculino' } else { 'feminino' }
+    $newTemplate = Join-Path $work "x\saves\MultiplayerStart-$body"
+    if (Test-Path (Join-Path $newTemplate 'sav.dat')) {
+        if (Test-Path $template) { Remove-Item $template -Recurse -Force }
+        Copy-Item $newTemplate $template -Recurse
+        $(if ($body -eq 'masculino') { 'male' } else { 'female' }) | Set-Content $bodyFile -NoNewline -Encoding ascii
+    }
+
     # O proprio atualizador e os scripts que vem no pacote.
     foreach ($script in 'Atualizar.ps1', 'Desinstalar.ps1', 'Desinstalar.bat') {
         $new = Join-Path $work "x\$script"
