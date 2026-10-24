@@ -120,7 +120,7 @@ $options = "--online --ip=$ServidorIp --port=11778 -skipStartScreen --discord-na
 
 # Atualizador: fica em %APPDATA%\NightCityOnline com um atalho na area de trabalho que
 # atualiza (se houver versao nova) e abre o jogo.
-foreach ($script in 'Atualizar.ps1', 'Jogar.bat', 'Desinstalar.ps1', 'Desinstalar.bat') {
+foreach ($script in 'Atualizar.ps1', 'Jogar.bat', 'Desinstalar.ps1', 'Desinstalar.bat', 'EnviarLogs.ps1', 'EnviarLogs.bat') {
     Copy-Item (Join-Path $here $script) (Join-Path $keyDir $script) -Force
 }
 $GameDir | Set-Content (Join-Path $keyDir 'jogo.txt') -Encoding utf8
@@ -134,7 +134,12 @@ $shortcut.TargetPath = Join-Path $keyDir 'Jogar.bat'
 $shortcut.WorkingDirectory = $keyDir
 $shortcut.IconLocation = "$exe,0"
 $shortcut.Save()
+$logsShortcut = $shell.CreateShortcut((Join-Path ([Environment]::GetFolderPath('Desktop')) 'Enviar logs Night City.lnk'))
+$logsShortcut.TargetPath = Join-Path $keyDir 'EnviarLogs.bat'
+$logsShortcut.WorkingDirectory = $keyDir
+$logsShortcut.Save()
 Write-Host '  Atalho "Jogar Night City Online" criado na area de trabalho (atualiza e abre o jogo).' -ForegroundColor Green
+Write-Host '  Atalho "Enviar logs Night City" criado - use quando algo der errado.' -ForegroundColor Green
 
 Write-Host ''
 Write-Host '  Ultimo passo, na Steam:' -ForegroundColor Cyan

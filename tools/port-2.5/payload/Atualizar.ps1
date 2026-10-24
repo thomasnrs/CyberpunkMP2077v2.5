@@ -30,6 +30,15 @@ try {
 }
 
 $installed = if (Test-Path $installedFile) { (Get-Content $installedFile -TotalCount 1).Trim() } else { '' }
+
+# Sem o save modelo, o PLAY carrega o save mais recente do jogador - normalmente o prologo de
+# quando o personagem foi criado. Se ele sumiu, reinstala mesmo sem versao nova.
+$templateSave = Join-Path $env:USERPROFILE 'Saved Games\CD Projekt Red\Cyberpunk 2077\MultiplayerStart\sav.dat'
+if (-not (Test-Path $templateSave)) {
+    Write-Host '  Save modelo nao encontrado - reinstalando.' -ForegroundColor Yellow
+    $installed = ''
+}
+
 if ($release.tag_name -eq $installed) {
     Write-Host "  Ja esta na versao mais nova ($installed)." -ForegroundColor Green
     Start-Game
@@ -88,7 +97,7 @@ try {
     }
 
     # O proprio atualizador e os scripts que vem no pacote.
-    foreach ($script in 'Atualizar.ps1', 'Desinstalar.ps1', 'Desinstalar.bat') {
+    foreach ($script in 'Atualizar.ps1', 'Desinstalar.ps1', 'Desinstalar.bat', 'EnviarLogs.ps1', 'EnviarLogs.bat') {
         $new = Join-Path $work "x\$script"
         if (Test-Path $new) { Copy-Item $new (Join-Path $home_ $script) -Force }
     }
