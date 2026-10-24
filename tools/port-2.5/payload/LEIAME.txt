@@ -1,0 +1,40 @@
+NIGHT CITY ONLINE - PORTE PARA O CYBERPUNK 2077 2.5
+====================================================
+
+Multiplayer para o Cyberpunk 2077, baseado no CyberpunkMP (Tilted Phoques) e no fork
+Night City Online, adaptado para o patch 2.5. Ainda e uma versao de teste.
+
+O QUE VOCE PRECISA
+  - Cyberpunk 2077 na Steam, atualizado na versao 2.5
+  - Tailscale (https://tailscale.com/download) logado na mesma rede de quem hospeda
+    o servidor - e assim que os PCs se enxergam sem abrir porta no roteador
+  - O IP do Tailscale de quem hospeda (algo como 100.x.y.z)
+
+INSTALAR
+  1. Feche o Cyberpunk.
+  2. Extraia este zip numa pasta qualquer.
+  3. Clique duas vezes em Instalar.bat e responda as perguntas
+     (tipo de corpo do personagem e IP do servidor).
+  4. Na Steam: Cyberpunk 2077 > botao direito > Propriedades > Geral >
+     Opcoes de inicializacao, e cole o que o instalador mostrar
+     (ele ja copia para a area de transferencia).
+
+JOGAR
+  Abra o jogo pela Steam. No menu aparecem CONNECT e CREATE NEW CHARACTER.
+  O personagem fica salvo no servidor, nao no seu PC.
+
+SEUS SAVES
+  O instalador nao mexe nos seus saves. Com as opcoes de inicializacao do
+  multiplayer o jogo nao salva nada (de proposito). Para voltar ao single player,
+  apague as opcoes de inicializacao na Steam.
+
+DESINSTALAR
+  Clique duas vezes em Desinstalar.bat. Ele remove exatamente o que foi instalado
+  e devolve qualquer arquivo que ja existia antes. Depois apague as opcoes de
+  inicializacao na Steam.
+
+SE DER PROBLEMA
+  Mande para quem te passou o pacote:
+  - Cyberpunk 2077\red4ext\logs\  (o arquivo mais recente)
+  - Cyberpunk 2077\red4ext\plugins\zzzCyberpunkMP\logs\  (o mais recente)
+  - VERSAO.txt deste pacote
