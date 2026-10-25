@@ -14,6 +14,9 @@ struct InterpolationSystem : RED4ext::IScriptable, Core::HookingAgent
     void OnAfterWorldDetach();
 
     void OnConnected();
+    // Restarts the interpolator if a world attach asked for it. Called right before
+    // progress(), on the thread that owns the flecs world - see OnWorldAttached.
+    void ServicePendingRestart();
     void OnDisconnected();
 
 protected:
@@ -22,6 +25,7 @@ protected:
 
 private:
     bool m_ready{false};
+    std::atomic_bool m_restartPending{false};
     flecs::system m_interpolator;
     // The OnAdd EntityComponent observer that lived here was removed on 27 August - see
     // the note in OnWorldAttached. InterpolationComponent is added explicitly at the two

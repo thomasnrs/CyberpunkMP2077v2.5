@@ -695,11 +695,27 @@ void InterpolationSystem::OnWorldAttached(RED4ext::world::RuntimeScene* aScene)
     // connection - still up - never started it again. Every remote puppet stood still
     // with 30 packets a second arriving and buffering. Restart it for any world that
     // attaches while already connected.
+    //
+    // Flagged, not done here: world attach can arrive off the thread that runs progress(),
+    // and building a flecs system there raced the next progress() - a client died inside
+    // flecs, reading 0xA9D, in the first frame after this line on a PLAY from the menu.
     if (!m_interpolator && Core::Container::Get<NetworkService>()->IsConnected())
     {
-        spdlog::info("[InterpolationSystem] world attached while connected - restarting the interpolator");
-        OnConnected();
+        spdlog::info("[InterpolationSystem] world attached while connected - interpolator restart queued");
+        m_restartPending = true;
     }
+}
+
+void InterpolationSystem::ServicePendingRestart()
+{
+    if (!m_restartPending.exchange(false))
+        return;
+
+    if (m_interpolator || !Core::Container::Get<NetworkService>()->IsConnected())
+        return;
+
+    spdlog::info("[InterpolationSystem] restarting the interpolator on the flecs thread");
+    OnConnected();
 }
 
 void InterpolationSystem::OnAfterWorldDetach()

@@ -460,7 +460,10 @@ void NetworkWorldSystem::Update(uint64_t aTick)
 
     const auto service = Core::Container::Get<NetworkService>();
     if (service && service->IsConnected())
+    {
+        m_interpolationSystem->ServicePendingRestart();
         progress(static_cast<float>(delta) / 1000.f);
+    }
 }
 
 void NetworkWorldSystem::OnWorldAttached(RED4ext::world::RuntimeScene* aScene)

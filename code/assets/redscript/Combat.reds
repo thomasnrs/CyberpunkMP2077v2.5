@@ -295,10 +295,15 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
         return;
     }
 
-    // A shot from the weapon already in hand: make it visibly fire.
+    // A shot from the weapon already in hand: make it visibly fire - in a callback of its own.
+    // Called inline, the first shot ever processed stopped the whole combat poll (no weapon,
+    // health or downed state was applied again that session): an error in it ends the poll's
+    // Call before it re-arms. Isolated, a failing shot costs only the shot.
     if Equals(puppet.m_mpHeldWeapon, weaponId) {
         if Equals(kind, 2u) {
-            MpRemoteFire(puppet);
+            let fire = new MpRemoteFireCallback();
+            fire.puppet = puppet;
+            GameInstance.GetDelaySystem(puppet.GetGame()).DelayCallback(fire, 0.0, false);
         }
         return;
     }
@@ -320,6 +325,16 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
 @addField(ScriptedPuppet)
 public let m_mpShotsSeen: Int32;
 
+public class MpRemoteFireCallback extends DelayCallback {
+    public let puppet: wref<ScriptedPuppet>;
+
+    public func Call() -> Void {
+        if IsDefined(this.puppet) {
+            MpRemoteFire(this.puppet);
+        }
+    }
+}
+
 public func MpRemoteFire(puppet: ref<ScriptedPuppet>) -> Void {
     let weapon = GameInstance.GetTransactionSystem(puppet.GetGame())
         .GetItemInSlot(puppet, t"AttachmentSlots.WeaponRight") as WeaponObject;
@@ -327,12 +342,18 @@ public func MpRemoteFire(puppet: ref<ScriptedPuppet>) -> Void {
         return;
     }
 
+    puppet.m_mpShotsSeen += 1;
+    let loud = puppet.m_mpShotsSeen <= 3;
+    if loud {
+        MpFTLog(s"[Weapon] remote \(EntityID.GetHash(puppet.GetEntityID())) firing (shot \(puppet.m_mpShotsSeen))");
+    }
+
     let params: gameprojectileWeaponParams;
     let zero = new Vector4(0.0, 0.0, 0.0, 0.0);
     weapon.AI_ShootForwards(puppet, Cast<Uint16>(0), params, Cast<Uint8>(0), 0.0, zero, zero, zero);
 
-    puppet.m_mpShotsSeen += 1;
-    if puppet.m_mpShotsSeen <= 3 {
+    // Absent after a "firing" line means the call itself is what fails.
+    if loud {
         MpFTLog(s"[Weapon] remote \(EntityID.GetHash(puppet.GetEntityID())) fired (shot \(puppet.m_mpShotsSeen))");
     }
 }
