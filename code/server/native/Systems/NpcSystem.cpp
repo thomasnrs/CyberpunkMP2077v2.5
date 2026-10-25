@@ -255,6 +255,20 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
         spdlog::warn("[Walker] {} its pistol", m_walkerArmed ? "drew" : "holstered");
     }
 
+    // And fires it, twice a second while drawn - remote shots can be checked alone too.
+    if (m_walkerArmed && aNow - m_walkerLastShot >= std::chrono::milliseconds(500))
+    {
+        m_walkerLastShot = aNow;
+
+        server::NotifyWeaponEvent shot;
+        shot.set_id(m_walker.id());
+        shot.set_kind(2u);
+        shot.set_weapon_id(129218226825ull); // Items.Preset_Lexington_Default
+
+        m_pWorld->each([&shot](flecs::entity, const PlayerComponent& aPlayer)
+                       { GServer->Send(aPlayer.Connection, shot); });
+    }
+
     // Walking pace round a 2m circle: one lap every ~9s. The first three seconds stand
     // still, so the client has spawned it before it starts moving.
     constexpr float kRadius = 2.f;

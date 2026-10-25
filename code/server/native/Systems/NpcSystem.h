@@ -59,4 +59,5 @@ private:
     std::chrono::steady_clock::time_point m_walkerDownSince{};
     std::chrono::steady_clock::time_point m_walkerLastWeaponToggle{};
     bool m_walkerArmed{false};
+    std::chrono::steady_clock::time_point m_walkerLastShot{};
 };

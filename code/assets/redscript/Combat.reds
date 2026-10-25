@@ -295,8 +295,11 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
         return;
     }
 
-    // A shot from the weapon already in hand changes nothing here.
+    // A shot from the weapon already in hand: make it visibly fire.
     if Equals(puppet.m_mpHeldWeapon, weaponId) {
+        if Equals(kind, 2u) {
+            MpRemoteFire(puppet);
+        }
         return;
     }
 
@@ -306,6 +309,32 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
     puppet.m_mpHeldWeapon = weaponId;
 
     MpFTLog(s"[Weapon] remote \(serverId) drew \(weaponId)");
+}
+
+/**
+ * A remote player's shot, seen. The weapon in the puppet's hand fires through the game's own
+ * NPC path (AI_ShootForwards, found by MpDumpFireApi) so the muzzle flash, sound and
+ * animation are the real ones - with ZERO projectiles, because damage is the server's: a
+ * real bullet from here would hit people on this screen a second time.
+ */
+@addField(ScriptedPuppet)
+public let m_mpShotsSeen: Int32;
+
+public func MpRemoteFire(puppet: ref<ScriptedPuppet>) -> Void {
+    let weapon = GameInstance.GetTransactionSystem(puppet.GetGame())
+        .GetItemInSlot(puppet, t"AttachmentSlots.WeaponRight") as WeaponObject;
+    if !IsDefined(weapon) {
+        return;
+    }
+
+    let params: gameprojectileWeaponParams;
+    let zero = new Vector4(0.0, 0.0, 0.0, 0.0);
+    weapon.AI_ShootForwards(puppet, Cast<Uint16>(0), params, Cast<Uint8>(0), 0.0, zero, zero, zero);
+
+    puppet.m_mpShotsSeen += 1;
+    if puppet.m_mpShotsSeen <= 3 {
+        MpFTLog(s"[Weapon] remote \(EntityID.GetHash(puppet.GetEntityID())) fired (shot \(puppet.m_mpShotsSeen))");
+    }
 }
 
 public func MpApplyRemoteLifeStates(network: ref<NetworkWorldSystem>) -> Void {
