@@ -688,6 +688,18 @@ void InterpolationSystem::OnWorldAttached(RED4ext::world::RuntimeScene* aScene)
     // changes ecs_stack_cursor_t's layout.
 
     m_ready = true;
+
+    // A world detach stops the interpolator (NetworkWorldSystem::OnBeforeWorldDetach), and
+    // only OnConnected used to start it. On 2.5 the main menu is itself a world: CONNECT
+    // there started it, PLAY then detached the menu world and stopped it, and the
+    // connection - still up - never started it again. Every remote puppet stood still
+    // with 30 packets a second arriving and buffering. Restart it for any world that
+    // attaches while already connected.
+    if (!m_interpolator && Core::Container::Get<NetworkService>()->IsConnected())
+    {
+        spdlog::info("[InterpolationSystem] world attached while connected - restarting the interpolator");
+        OnConnected();
+    }
 }
 
 void InterpolationSystem::OnAfterWorldDetach()
@@ -699,6 +711,10 @@ void InterpolationSystem::OnAfterWorldDetach()
 
 void InterpolationSystem::OnConnected()
 {
+    // Never two interpolators: OnWorldAttached can start one too.
+    if (m_interpolator)
+        m_interpolator.destruct();
+
     const auto pNetworkService = Core::Container::Get<NetworkService>();
 
     const float cSimulationDelay = 50.f + (1500.f / pNetworkService->GetServerSettings().get_update_rate());
@@ -717,10 +733,28 @@ void InterpolationSystem::OnDisconnected()
 {
     if (m_interpolator)
         m_interpolator.destruct();
+    m_interpolator = flecs::system();
 }
 
 void InterpolationSystem::HandleNotifyEntityMove(const PacketEvent<server::NotifyEntityMove>& aMessage)
 {
+    // Every movement packet that reaches this handler, per id, before any filter below.
+    // Remote puppets froze with packets arriving and no line from any of the returns that
+    // follow; this says whether the packets get here at all.
+    {
+        static std::unordered_map<uint64_t, std::pair<uint32_t, std::chrono::steady_clock::time_point>> s_arrivals;
+        auto& [count, since] = s_arrivals[aMessage.get_id()];
+        ++count;
+        const auto now = std::chrono::steady_clock::now();
+        if (now - since >= std::chrono::seconds(5))
+        {
+            spdlog::info("[Interpolation] {} move packet(s) for id {} reached the handler (tick {}, ours {})", count,
+                         aMessage.get_id(), aMessage.get_tick(), NetworkWorldSystem::GetTick());
+            count = 0;
+            since = now;
+        }
+    }
+
     const auto pSystem = Red::GetGameSystem<NetworkWorldSystem>();
     const auto entity = pSystem->GetEntityByServerId(aMessage.get_id());
 

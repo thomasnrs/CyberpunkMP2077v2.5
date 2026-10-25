@@ -182,6 +182,9 @@ void Settings::Load()
     if (launchParameters.Get("-puppet-driver-all"))
         settings.puppetDriverAll = true;
 
+    if (launchParameters.Get("-autoplay"))
+        settings.autoplay = true;
+
     // A FILE, not only a launch argument.
     //
     // The launcher owns the command line - it passes the Discord token, the server address

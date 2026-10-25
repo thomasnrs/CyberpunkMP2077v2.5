@@ -188,6 +188,9 @@ public native class NetworkWorldSystem extends IGameSystem {
      */
     public native func IsModEnabled() -> Bool;
 
+    // --autoplay: true once per launch, and the menu then presses PLAY by itself.
+    public native func ConsumeAutoplay() -> Bool;
+
     public native func GetCallState() -> Uint32;
     public native func HasCall() -> Bool;
 

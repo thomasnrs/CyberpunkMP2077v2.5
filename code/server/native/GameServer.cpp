@@ -9,6 +9,7 @@
 #include <Components/PlayerComponent.h>
 #include <Components/MovementComponent.h>
 #include "Systems/ChatSystem.h"   // jail radius and the chat channel ids
+#include "Systems/NpcSystem.h"    // the debug walker
 
 #include "Core/Filesystem.h"
 #include "Game/Level.h"
@@ -201,6 +202,9 @@ void GameServer::OnUpdate()
     ReverifyPlayers(now);
     SavePlayerPositions(now);
     ReplicatePendingMovement(now);
+
+    if (auto* pNpcs = m_pWorld->get_mut<NpcSystem>())
+        pNpcs->UpdateWalker(now);
 
     EnforceJail(now);
     ExpireCalls(now);

@@ -27,10 +27,22 @@ struct NpcSystem
 
     void Save() noexcept;
 
+    // Debug walker: with config/walker.on present, a mannequin appears beside the first
+    // player in the world and walks a circle, sending the same movement a player's client
+    // sends. One person can then check remote-puppet movement without a second player.
+    void UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcept;
+
 protected:
     void Load() noexcept;
 
 private:
     World* m_pWorld;
     std::filesystem::path m_statePath;
+
+    bool m_walkerEnabled{false};
+    flecs::entity m_walker;
+    glm::vec3 m_walkerCenter{};
+    std::chrono::steady_clock::time_point m_walkerStart{};
+    std::chrono::steady_clock::time_point m_walkerLastStep{};
+    std::chrono::steady_clock::time_point m_playerFirstSeen{};
 };

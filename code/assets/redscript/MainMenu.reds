@@ -545,6 +545,22 @@ private func PopulateMenuItemList() -> Void {
      * game's own mechanism and are reliably clickable, focusable and controller-navigable -
      * none of which a widget built at runtime gets for free.
      */
+    // --autoplay: PLAY, pressed once by itself. The poll starts in debt so it waits ~12s
+    // for the connection rather than the 2.5s a press against an open roster gets.
+    if IsDefined(network) && network.ConsumeAutoplay() {
+        MpCsLog(s"--autoplay: connecting and entering the world without a click");
+
+        if !network.IsConnected() {
+            network.ConnectFromMenu();
+        }
+
+        let autoPoll = new MpSelectorPoll();
+        autoPoll.controller = this;
+        autoPoll.attempts = -40;
+        autoPoll.enterWhenKnown = true;
+        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(autoPoll, 0.25, false);
+    }
+
     if IsDefined(network) {
         if network.IsCharacterStatusKnown() {
             /*

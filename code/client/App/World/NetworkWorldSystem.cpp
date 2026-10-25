@@ -2846,6 +2846,14 @@ bool NetworkWorldSystem::IsModEnabled() const
     return !Settings::IsDisabled();
 }
 
+bool NetworkWorldSystem::ConsumeAutoplay()
+{
+    // Static rather than a member: the game system can be rebuilt between menu visits, and
+    // coming back to the menu after leaving the world must not start the game again.
+    static std::atomic_bool s_consumed{false};
+    return Settings::Get().autoplay && !s_consumed.exchange(true);
+}
+
 void NetworkWorldSystem::RequestCall(const Red::CString& acNumber)
 {
     const auto& service = Core::Container::Get<NetworkService>();

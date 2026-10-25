@@ -137,6 +137,10 @@ struct Settings
     // The A/B lever for retiring the legacy idle-controller hijack.
     bool puppetDriverAll = false;
 
+    // --autoplay: the main menu presses PLAY by itself once, so a test session can be
+    // started from a script with nobody at the keyboard.
+    bool autoplay = false;
+
     /**
      * PHASE 1 EXPERIMENT - make the LOCAL player a mod-spawned puppet.
      *

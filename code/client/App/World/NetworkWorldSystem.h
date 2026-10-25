@@ -291,6 +291,9 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
      */
     bool IsModEnabled() const;
 
+    // True once per game launch when --autoplay was passed; the menu then plays by itself.
+    bool ConsumeAutoplay();
+
     // ---------------------------------------------------------------------------
     // Voice devices and capture.
     //
@@ -973,6 +976,7 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(DeleteCharacter);
     RTTI_METHOD(LeaveWorld);
     RTTI_METHOD(IsModEnabled);
+    RTTI_METHOD(ConsumeAutoplay);
     RTTI_METHOD(GetCallState);
     RTTI_METHOD(HasCall);
     RTTI_METHOD(GetCallName);

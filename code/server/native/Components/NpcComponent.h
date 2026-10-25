@@ -9,4 +9,7 @@ struct NpcComponent
 {
     std::string Record;
     std::string Name;
+
+    // The debug walker (NpcSystem::UpdateWalker): never written to npcs.json.
+    bool Transient{false};
 };
