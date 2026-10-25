@@ -45,6 +45,29 @@ protected func DamagePipelineFinalized(evt: ref<gameHitEvent>) -> Void {
  *
  * Silent about everything else on purpose. This runs for every NPC hit in the game.
  */
+/**
+ * World sync groundwork: is an NPC the same entity on every machine?
+ *
+ * The map bakes static EntityIDs into its sectors, identical on every install; community and
+ * crowd spawns get dynamic ids chosen at runtime. Which kind gig enemies and street NPCs are
+ * decides the whole design - static ones can have their deaths synced by id alone, dynamic
+ * ones need an owner simulating them for everybody. Logged once per NPC hit, first 20.
+ */
+@addField(PlayerPuppet)
+public let m_mpNpcIdsNoted: array<Uint32>;
+
+public func MpNoteNpcIdentity(me: ref<PlayerPuppet>, npc: ref<ScriptedPuppet>) -> Void {
+    let id = npc.GetEntityID();
+    let hash = EntityID.GetHash(id);
+    if ArraySize(me.m_mpNpcIdsNoted) >= 20 || ArrayContains(me.m_mpNpcIdsNoted, hash) {
+        return;
+    }
+    ArrayPush(me.m_mpNpcIdsNoted, hash);
+
+    let pos = npc.GetWorldPosition();
+    MpFTLog(s"[NpcId] \(hash) static=\(EntityID.IsStatic(id)) dynamic=\(EntityID.IsDynamic(id)) record=\(TDBID.ToStringDEBUG(npc.GetRecordID())) (\(TDBID.ToNumber(npc.GetRecordID()))) class=\(NameToString(npc.GetClassName())) at (\(pos.X), \(pos.Y), \(pos.Z))");
+}
+
 public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> Void {
     if !IsDefined(target) || !IsDefined(evt) {
         return;
@@ -74,11 +97,9 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     // common case rather than an error.
     let targetId = network.GetServerIdByEntity(target.GetEntityID());
     if Equals(targetId, 0ul) {
-        // One ordinary NPC's components, to compare against a remote puppet's.
         let me = GetPlayer(GetGameInstance());
-        if IsDefined(me) && !me.m_mpNpcComponentsDumped && !target.HasTag(n"CyberpunkMP.Puppet") {
-            me.m_mpNpcComponentsDumped = true;
-            MpDumpComponents(target, s"hit NPC \(NameToString(target.GetClassName()))");
+        if IsDefined(me) && !target.HasTag(n"CyberpunkMP.Puppet") {
+            MpNoteNpcIdentity(me, target);
         }
 
         if target.HasTag(n"CyberpunkMP.Puppet") {
