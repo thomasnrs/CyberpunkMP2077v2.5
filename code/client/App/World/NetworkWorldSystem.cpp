@@ -2347,7 +2347,11 @@ void NetworkWorldSystem::HandleDamageResult(const PacketEvent<server::NotifyDama
     // Everyone in range receives this so bystanders can render the hit. Only the person it
     // happened to changes their own health from it.
     if (!self || *self != aMessage.get_target_id())
+    {
+        if (aMessage.get_knocked_down())
+            NoteRemoteLifeState(aMessage.get_target_id(), 1);
         return;
+    }
 
     // Absolute, not a delta. A dropped delta diverges forever; an absolute figure from the
     // authority cannot, and the server is the only thing that knows what armour actually
@@ -2366,14 +2370,52 @@ void NetworkWorldSystem::HandleCombatState(const PacketEvent<server::NotifyComba
 {
     const auto self = GetRemotePlayerId();
 
+    // Somebody else. This used to be dropped, so only the victim ever saw themselves down:
+    // to everyone else a downed player stood there, or lay wherever their own game's
+    // simulation of the puppet had left it.
     if (!self || *self != aMessage.get_id())
+    {
+        NoteRemoteLifeState(aMessage.get_id(), aMessage.get_life_state());
         return;
+    }
 
     m_incomingHealth = aMessage.get_health();
     m_downed = aMessage.get_life_state() != 0;
 
     spdlog::info("[Combat] server set our health to {:.1f} (state {})", aMessage.get_health(),
                  aMessage.get_life_state());
+}
+
+void NetworkWorldSystem::NoteRemoteLifeState(uint64_t aServerId, uint32_t aState)
+{
+    auto [it, inserted] = m_remoteLifeStates.try_emplace(aServerId, 0u);
+    if (!inserted && it->second == aState)
+        return;
+    if (inserted && aState == 0)
+        return;
+
+    it->second = aState;
+    m_remoteLifeChanges.push_back({aServerId, aState});
+
+    spdlog::info("[Combat] entity {} is now in life state {}", aServerId, aState);
+}
+
+uint64_t NetworkWorldSystem::ConsumeRemoteLifeChange()
+{
+    if (m_remoteLifeChanges.empty())
+        return 0;
+
+    const auto [id, state] = m_remoteLifeChanges.front();
+    m_remoteLifeChanges.erase(m_remoteLifeChanges.begin());
+
+    m_consumedLifeState = state;
+    return id;
+}
+
+uint32_t NetworkWorldSystem::GetRemoteLifeState(uint64_t aServerId) const
+{
+    const auto it = m_remoteLifeStates.find(aServerId);
+    return it == m_remoteLifeStates.end() ? 0u : it->second;
 }
 
 void NetworkWorldSystem::SendQuickhackUpload(uint64_t aTargetServerId, uint32_t aState, uint64_t aQuickhackId,

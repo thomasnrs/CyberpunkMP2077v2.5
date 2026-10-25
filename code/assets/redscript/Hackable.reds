@@ -113,6 +113,12 @@ public func MpStripInheritedGodMode(entity: ref<GameObject>) -> Void {
 
     MpClearRecordGodMode(entity, "attach");
 
+    // Immortal, from our own source: hits still land and still get reported (Combat.reds),
+    // but this machine can no longer kill the puppet on its own. Whether a remote player is
+    // down is the server's call, drawn by MpApplyRemoteLifeStates.
+    GameInstance.GetGodModeSystem(entity.GetGame())
+        .AddGodMode(entity.GetEntityID(), gameGodModeType.Immortal, n"CyberpunkMP.RemotePuppet");
+
     let recheck = new MpGodModeRecheckCallback();
     recheck.entity = entity;
     GameInstance.GetDelaySystem(entity.GetGame()).DelayCallback(recheck, MpGodModeRecheckSeconds(), false);
@@ -155,5 +161,15 @@ public class MpGodModeRecheckCallback extends DelayCallback {
             return;
         }
         MpClearRecordGodMode(this.entity, "recheck");
+
+        // Streamed in while already down: draw it that way.
+        let network = GameInstance.GetNetworkWorldSystem();
+        if IsDefined(network) {
+            let serverId = network.GetServerIdByEntity(this.entity.GetEntityID());
+            let state = network.GetRemoteLifeState(serverId);
+            if NotEquals(serverId, 0ul) && NotEquals(state, 0u) {
+                MpDrawRemoteLifeState(network, serverId, state);
+            }
+        }
     }
 }

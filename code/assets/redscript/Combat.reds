@@ -165,6 +165,94 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
         evt.hitDirection,
         false,                   // crit
         false);                  // headshot
+
+    // The claim is sent; the puppet's own health pool is ours to keep full. The server owns
+    // the real number, and a local pool run dry is how a puppet dies on one screen only.
+    let refill = new MpRefillPuppetHealthCallback();
+    refill.puppet = target;
+    GameInstance.GetDelaySystem(target.GetGame()).DelayCallback(refill, 0.1, false);
+}
+
+/**
+ * A takedown the engine expressed as a knock-out rather than as damage - landing on
+ * somebody's head is one. Reported as a full-pool melee hit, which the server clamps to
+ * exactly what downs a player and nothing more.
+ */
+public func MpReportTakedown(network: ref<NetworkWorldSystem>, target: ref<ScriptedPuppet>, targetId: Uint64) -> Void {
+    network.SendCombatEvent(
+        targetId,
+        1u,                      // melee
+        1u,                      // melee
+        0ul,
+        0u,
+        0u,
+        100.0,
+        target.GetWorldPosition(),
+        new Vector4(0.0, 0.0, 0.0, 0.0),
+        false,
+        false);
+
+    FTLog(s"[Combat] knocked remote entity \(targetId) out - reported as a takedown");
+}
+
+public class MpRefillPuppetHealthCallback extends DelayCallback {
+    public let puppet: wref<ScriptedPuppet>;
+
+    public func Call() -> Void {
+        if !IsDefined(this.puppet) {
+            return;
+        }
+
+        GameInstance.GetStatPoolsSystem(this.puppet.GetGame()).RequestSettingStatPoolValue(
+            Cast<StatsObjectID>(this.puppet.GetEntityID()), gamedataStatPoolType.Health, 100.0, null, false);
+    }
+}
+
+/**
+ * Set by MpDrawRemoteLifeState while the server has this puppet down, so the guard in
+ * MpReportStatusEffect knows the Defeated on it is the server's and leaves it alone.
+ */
+@addField(ScriptedPuppet)
+public let m_mpServerDowned: Bool;
+
+/**
+ * Draw other players down or back up, as the server says.
+ *
+ * The same Defeated the victim's own game applies to them (MpApplyDownedState), put on the
+ * puppet that stands for them here - so everyone sees the one state the server holds.
+ */
+public func MpApplyRemoteLifeStates(network: ref<NetworkWorldSystem>) -> Void {
+    let serverId = network.ConsumeRemoteLifeChange();
+
+    while NotEquals(serverId, 0ul) {
+        MpDrawRemoteLifeState(network, serverId, network.GetConsumedLifeState());
+        serverId = network.ConsumeRemoteLifeChange();
+    }
+}
+
+public func MpDrawRemoteLifeState(network: ref<NetworkWorldSystem>, serverId: Uint64, state: Uint32) -> Void {
+    let entityId = network.GetEntityIdByServerId(serverId);
+    if !EntityID.IsDefined(entityId) {
+        FTLog(s"[Combat] entity \(serverId) changed life state but is not spawned here - drawn when it streams in");
+        return;
+    }
+
+    let puppet = GameInstance.FindEntityByID(GetGameInstance(), entityId) as ScriptedPuppet;
+    if !IsDefined(puppet) {
+        return;
+    }
+
+    if NotEquals(state, 0u) {
+        puppet.m_mpServerDowned = true;
+        StatusEffectHelper.ApplyStatusEffect(puppet, t"BaseStatusEffect.Defeated");
+        FTLog(s"[Combat] remote entity \(serverId) is down (state \(state)) - Defeated applied");
+        return;
+    }
+
+    puppet.m_mpServerDowned = false;
+    StatusEffectHelper.RemoveStatusEffect(puppet, t"BaseStatusEffect.Defeated");
+    StatusEffectHelper.RemoveStatusEffect(puppet, t"BaseStatusEffect.Unconscious");
+    FTLog(s"[Combat] remote entity \(serverId) is back up");
 }
 
 /**
@@ -198,13 +286,33 @@ public func MpReportStatusEffect(target: ref<ScriptedPuppet>, evt: ref<ApplyStat
         return;
     }
 
-    // Only what WE caused. Every client has these puppets, and without this every observer
-    // would report the same hack - and the victim would receive it several times over.
     let player = GetPlayer(GetGameInstance());
-    if !IsDefined(player) {
+    if !IsDefined(player) || Equals(target.GetEntityID(), player.GetEntityID()) {
         return;
     }
 
+    // Whether a remote player is down is the SERVER's call. Landing on one's head knocked
+    // the puppet out on the attacker's machine only (BaseStatusEffect.Unconscious): it lay
+    // there for them while the real player walked on. Anything that drops a puppet is taken
+    // back off here; a knock-out WE caused becomes a takedown claim, and the server downs
+    // them for everyone - this puppet included - through MpApplyRemoteLifeStates.
+    let effectId = evt.staticData.GetID();
+    let unconscious = Equals(effectId, t"BaseStatusEffect.Unconscious");
+    let drops = unconscious || Equals(effectId, t"BaseStatusEffect.Defeated")
+        || Equals(effectId, t"BaseStatusEffect.DefeatedWithRecover");
+
+    if drops && !target.m_mpServerDowned {
+        StatusEffectHelper.RemoveStatusEffect(target, effectId);
+        FTLog(s"[Combat] took \(TDBID.ToNumber(effectId)) back off remote entity \(targetId) - only the server downs players");
+
+        if unconscious && Equals(evt.instigatorEntityID, player.GetEntityID()) {
+            MpReportTakedown(network, target, targetId);
+        }
+        return;
+    }
+
+    // Only what WE caused. Every client has these puppets, and without this every observer
+    // would report the same hack - and the victim would receive it several times over.
     if NotEquals(evt.instigatorEntityID, player.GetEntityID()) {
         return;
     }
@@ -251,6 +359,7 @@ public class MpStatusEffectPoll extends DelayCallback {
 
                 MpApplyServerHealth(player, network);
                 MpApplyDownedState(player, network);
+                MpApplyRemoteLifeStates(network);
                 MpApplyIncomingUploads(network);
             }
         }

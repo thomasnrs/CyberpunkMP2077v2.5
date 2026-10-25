@@ -427,6 +427,15 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     // Whether the server has us down. Script reads it to stop treating us as upright.
     bool IsDowned() const { return m_downed; }
 
+    // Life-state changes of OTHER combatants, for drawing them down or back up. Returns the
+    // server id of the next one waiting (0 when none) and leaves its new state for
+    // GetConsumedLifeState. See MpApplyRemoteLifeStates in Combat.reds.
+    uint64_t ConsumeRemoteLifeChange();
+    uint32_t GetConsumedLifeState() const { return m_consumedLifeState; }
+    // The last state the server gave for one of them, so a puppet that streams in late is
+    // drawn the way it already is. 0 (alive) when nothing was ever said.
+    uint32_t GetRemoteLifeState(uint64_t aServerId) const;
+
     // Whether --hackable-puppets was passed. See Hackable.reds.
     bool HackablePuppetsEnabled() const;
 
@@ -852,6 +861,10 @@ private:
     // nothing new since script last looked.
     float m_incomingHealth{-1.f};
     bool m_downed{false};
+    void NoteRemoteLifeState(uint64_t aServerId, uint32_t aState);
+    std::unordered_map<uint64_t, uint32_t> m_remoteLifeStates;
+    Vector<std::pair<uint64_t, uint32_t>> m_remoteLifeChanges;
+    uint32_t m_consumedLifeState{0};
 
     // Uploads somebody else started, as (server id, state) pairs waiting for script.
     Vector<uint64_t> m_incomingUploads;
@@ -1017,6 +1030,9 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(ConsumeIncomingStatusEffect);
     RTTI_METHOD(ConsumeIncomingHealth);
     RTTI_METHOD(IsDowned);
+    RTTI_METHOD(ConsumeRemoteLifeChange);
+    RTTI_METHOD(GetConsumedLifeState);
+    RTTI_METHOD(GetRemoteLifeState);
     RTTI_METHOD(SendQuickhackUpload);
     RTTI_METHOD(ConsumeIncomingUploadTarget);
     RTTI_METHOD(GetIncomingUploadState);
