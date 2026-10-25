@@ -18,7 +18,7 @@ struct NpcSystem
     // Declare one. Broadcasts to everyone in the world immediately; late joiners get
     // it through the same catch-up sweep that shows them the players already online.
     flecs::entity Spawn(const std::string& acRecord, const std::string& acName, const glm::vec3& acPosition,
-                        float aYaw) noexcept;
+                        float aYaw, const struct AppearanceComponent* apAppearance = nullptr) noexcept;
 
     // Remove every declared NPC (and forget them). Each removal broadcasts an unload.
     size_t Clear() noexcept;

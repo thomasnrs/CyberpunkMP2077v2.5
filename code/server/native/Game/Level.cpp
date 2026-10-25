@@ -1676,7 +1676,7 @@ void Level::HandleWeaponEventRequest(PacketEvent<client::WeaponEventRequest>& aM
         // T while tolerating a burst of up to tau/T shots arriving together. Batched delivery
         // passes; a script firing every frame forever runs the clock past tau and is refused.
         constexpr uint64_t kShotIntervalMs = 40;   // sustained: 1500 RPM, above anything shipped
-        constexpr uint64_t kBurstToleranceMs = 500; // ~12 shots may arrive in one flush
+        constexpr uint64_t kBurstToleranceMs = 3000; // ~75 shots: the client polls 4x/s and reports a whole magazine dump at once
 
         // Refuse only when the stream has run more than the tolerance ahead of the sustained
         // rate - genuine over-fire, not a delivery batch.
@@ -1696,12 +1696,8 @@ void Level::HandleWeaponEventRequest(PacketEvent<client::WeaponEventRequest>& aM
     }
 
     case kReloadStart:
-        if (pWeapon->ReserveAmmo == 0)
-        {
-            correctClient = true;
-            break;
-        }
-
+        // No reserve check: the client's weapon poll has never reported a reserve (it sends
+        // 0 on equip), so this refused every reload anyone ever made.
         pWeapon->Reloading = true;
         pWeapon->ReloadStartedMs = now;
         break;
@@ -1710,9 +1706,11 @@ void Level::HandleWeaponEventRequest(PacketEvent<client::WeaponEventRequest>& aM
     {
         // A completion with no start is a client refilling instantly. Refused, and the real
         // state sent back so the refusal is visible rather than silent.
-        constexpr uint64_t kMinReloadMs = 500;
-
-        if (!pWeapon->Reloading || now - pWeapon->ReloadStartedMs < kMinReloadMs)
+        //
+        // No minimum duration: the client notices a reload by polling its magazine, so start
+        // and completion always arrive in the same packet, and a 500ms floor refused all of
+        // them. Start-before-complete is still required.
+        if (!pWeapon->Reloading)
         {
             spdlog::warn("Refused a reload from {}", pPlayerComponent->Username);
             correctClient = true;
@@ -1726,14 +1724,12 @@ void Level::HandleWeaponEventRequest(PacketEvent<client::WeaponEventRequest>& aM
                                     ? aMessage.get_magazine_ammo() - pWeapon->MagazineAmmo
                                     : 0;
 
-        const uint32_t moved = std::min(wanted, pWeapon->ReserveAmmo);
-
-        pWeapon->MagazineAmmo += moved;
-        pWeapon->ReserveAmmo -= moved;
+        // Conservation needs a reserve, and no client has ever reported one: with a reserve
+        // of zero every reload moved nothing, the magazine stayed empty, and every shot after
+        // it was refused. Until the poll sends the reserve, the client's magazine is taken.
+        (void)wanted;
+        pWeapon->MagazineAmmo = aMessage.get_magazine_ammo();
         pWeapon->Reloading = false;
-
-        if (moved != wanted)
-            correctClient = true;
 
         break;
     }

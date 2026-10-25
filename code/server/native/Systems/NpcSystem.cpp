@@ -43,13 +43,17 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
         m_walker = flecs::entity{};
 
         const MovementComponent* pAnchor = nullptr;
+        flecs::entity anchorPuppet;
         m_pWorld->each(
-            [&pAnchor](flecs::entity, const PlayerComponent& aPlayer)
+            [&pAnchor, &anchorPuppet](flecs::entity, const PlayerComponent& aPlayer)
             {
                 if (pAnchor || !aPlayer.Puppet || !aPlayer.Puppet.is_alive())
                     return;
                 if (const auto* pMovement = aPlayer.Puppet.get<MovementComponent>(); pMovement && pMovement->Tick != 0)
+                {
                     pAnchor = pMovement;
+                    anchorPuppet = aPlayer.Puppet;
+                }
             });
 
         if (!pAnchor)
@@ -68,8 +72,11 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
         // centred 5m away put half the lap inside a wall.
         m_walkerCenter = pAnchor->Position;
         m_walkerStart = aNow;
-        // Where the lap starts (angle 0), not on top of the player.
-        m_walker = Spawn("Character.WaMuppet", "Walker", m_walkerCenter + glm::vec3{2.f, 0.f, 0.f}, 0.f);
+        // Where the lap starts (angle 0), not on top of the player. Wearing the player's own
+        // appearance: the bare mannequin floated upside down and no shot ever registered on
+        // it, so it was no stand-in for a real remote player. A clone is.
+        m_walker = Spawn("Character.WaMuppet", "Walker", m_walkerCenter + glm::vec3{2.f, 0.f, 0.f}, 0.f,
+                         anchorPuppet.get<AppearanceComponent>());
         if (auto* pNpc = m_walker.get_mut<NpcComponent>())
             pNpc->Transient = true;
         m_walker.set<HealthComponent>({});
@@ -163,11 +170,12 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
 }
 
 flecs::entity NpcSystem::Spawn(const std::string& acRecord, const std::string& acName,
-                               const glm::vec3& acPosition, float aYaw) noexcept
+                               const glm::vec3& acPosition, float aYaw,
+                               const AppearanceComponent* apAppearance) noexcept
 {
     auto entity = m_pWorld->entity()
                       .set<MovementComponent>({acPosition, {0.f, 0.f, aYaw}, {}})
-                      .set<AppearanceComponent>({})
+                      .set<AppearanceComponent>(apAppearance ? *apAppearance : AppearanceComponent{})
                       .set<NpcComponent>({acRecord, acName});
 
     // The same door players walk through: Add tags it as a level actor, broadcasts the
