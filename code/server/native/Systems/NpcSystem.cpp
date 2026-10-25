@@ -6,6 +6,7 @@
 #include "Components/AppearanceComponent.h"
 #include "Components/NpcComponent.h"
 #include "Components/PlayerComponent.h"
+#include "Components/HealthComponent.h"
 #include "GameServer.h"
 
 #include "Core/Filesystem.h"
@@ -71,6 +72,7 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
         m_walker = Spawn("Character.WaMuppet", "Walker", m_walkerCenter + glm::vec3{2.f, 0.f, 0.f}, 0.f);
         if (auto* pNpc = m_walker.get_mut<NpcComponent>())
             pNpc->Transient = true;
+        m_walker.set<HealthComponent>({});
 
         spdlog::warn("[Walker] spawned 5m from the player at ({:.1f}, {:.1f}, {:.1f})", m_walkerCenter.x,
                      m_walkerCenter.y, m_walkerCenter.z);
@@ -80,6 +82,51 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
     const auto* pCurrent = m_walker.get<MovementComponent>();
     if (!pCurrent)
         return;
+
+    // A combatant like any player, so PvP can be tested by one person: shot down, it stays
+    // down (and still) for ten seconds and then stands back up, broadcasting both changes
+    // exactly as a revive does.
+    if (auto* pHealth = m_walker.get_mut<HealthComponent>(); pHealth && pHealth->LifeState != 0)
+    {
+        if (m_walkerDownSince == std::chrono::steady_clock::time_point{})
+        {
+            m_walkerDownSince = aNow;
+            spdlog::warn("[Walker] downed - standing back up in 10s");
+        }
+
+        if (aNow - m_walkerDownSince < std::chrono::seconds(10))
+            return;
+
+        pHealth->Health = pHealth->MaxHealth;
+        pHealth->LifeState = 0;
+        pHealth->DownedAt = 0;
+        m_walkerDownSince = {};
+
+        if (auto* pLevel = m_pWorld->get_mut<Level>())
+            pLevel->BroadcastCombatState(m_walker);
+
+        spdlog::warn("[Walker] back up");
+    }
+
+    // Draws and holsters a pistol every six seconds, sent the way the server relays a
+    // player's own weapon events, so remote weapons can be checked without a second player.
+    if (aNow - m_walkerLastWeaponToggle >= std::chrono::seconds(6))
+    {
+        m_walkerLastWeaponToggle = aNow;
+        m_walkerArmed = !m_walkerArmed;
+
+        constexpr uint64_t kLexington = 129218226825ull; // Items.Preset_Lexington_Default
+
+        server::NotifyWeaponEvent event;
+        event.set_id(m_walker.id());
+        event.set_kind(m_walkerArmed ? 0u : 1u);
+        event.set_weapon_id(m_walkerArmed ? kLexington : 0ull);
+
+        m_pWorld->each([&event](flecs::entity, const PlayerComponent& aPlayer)
+                       { GServer->Send(aPlayer.Connection, event); });
+
+        spdlog::warn("[Walker] {} its pistol", m_walkerArmed ? "drew" : "holstered");
+    }
 
     // Walking pace round a 2m circle: one lap every ~9s. The first three seconds stand
     // still, so the client has spawned it before it starts moving.

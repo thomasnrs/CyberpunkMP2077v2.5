@@ -29,7 +29,9 @@ struct NpcSystem
 
     // Debug walker: with config/walker.on present, a mannequin appears beside the first
     // player in the world and walks a circle, sending the same movement a player's client
-    // sends. One person can then check remote-puppet movement without a second player.
+    // sends. It also has health (shoot it: it goes down for 10s and gets back up) and draws
+    // and holsters a pistol every 6s, so movement, PvP, downed state and remote weapons can
+    // all be checked by one person.
     void UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcept;
 
 protected:
@@ -45,4 +47,7 @@ private:
     std::chrono::steady_clock::time_point m_walkerStart{};
     std::chrono::steady_clock::time_point m_walkerLastStep{};
     std::chrono::steady_clock::time_point m_playerFirstSeen{};
+    std::chrono::steady_clock::time_point m_walkerDownSince{};
+    std::chrono::steady_clock::time_point m_walkerLastWeaponToggle{};
+    bool m_walkerArmed{false};
 };
