@@ -2400,6 +2400,37 @@ void NetworkWorldSystem::NoteRemoteLifeState(uint64_t aServerId, uint32_t aState
     spdlog::info("[Combat] entity {} is now in life state {}", aServerId, aState);
 }
 
+void NetworkWorldSystem::HandleWeaponEvent(const PacketEvent<server::NotifyWeaponEvent>& aMessage)
+{
+    // The server relays every player's weapon events to everyone, and nothing here ever
+    // listened: a remote player's weapon stayed holstered on every other screen however
+    // much they fired. Our own come back too and are not ours to draw.
+    const auto self = GetRemotePlayerId();
+    if (self && *self == aMessage.get_id())
+        return;
+
+    // Fire and reload arrive per shot; only what changes the weapon in hand is queued.
+    // A shot from a weapon never seen equipped still counts as equipping it.
+    const auto kind = aMessage.get_kind();
+    if (kind != 0 && kind != 1 && kind != 2)
+        return;
+
+    m_remoteWeaponEvents.push_back({aMessage.get_id(), kind, aMessage.get_weapon_id()});
+}
+
+uint64_t NetworkWorldSystem::ConsumeRemoteWeaponEvent()
+{
+    if (m_remoteWeaponEvents.empty())
+        return 0;
+
+    const auto event = m_remoteWeaponEvents.front();
+    m_remoteWeaponEvents.erase(m_remoteWeaponEvents.begin());
+
+    m_consumedWeaponKind = event.Kind;
+    m_consumedWeaponId = event.WeaponId;
+    return event.Id;
+}
+
 uint64_t NetworkWorldSystem::ConsumeRemoteLifeChange()
 {
     if (m_remoteLifeChanges.empty())
@@ -3877,6 +3908,7 @@ void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleStatusEffect>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleDamageResult>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCombatState>(this);
+    pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWeaponEvent>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleQuickhackUpload>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleVehicleControlAssigned>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCharacterList>(this);

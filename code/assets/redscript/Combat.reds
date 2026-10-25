@@ -70,6 +70,9 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     // common case rather than an error.
     let targetId = network.GetServerIdByEntity(target.GetEntityID());
     if Equals(targetId, 0ul) {
+        if target.HasTag(n"CyberpunkMP.Puppet") {
+            MpFTLog(s"[Combat] hit on remote puppet \(EntityID.GetHash(target.GetEntityID())) dropped - no server id for it");
+        }
         return;
     }
 
@@ -80,10 +83,12 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     let player = GetPlayer(GetGameInstance());
 
     if !IsDefined(instigator) || !IsDefined(player) {
+        MpFTLog(s"[Combat] hit on remote \(targetId) dropped - no instigator");
         return;
     }
 
     if NotEquals(instigator.GetEntityID(), player.GetEntityID()) {
+        MpFTLog(s"[Combat] hit on remote \(targetId) dropped - not ours (instigator \(EntityID.GetHash(instigator.GetEntityID())))");
         return;
     }
 
@@ -101,8 +106,11 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     // A hit that did nothing is not worth a packet. Grazes, blocked shots and the second
     // half of a piercing round all land here.
     if damage <= 0.0 {
+        MpFTLog(s"[Combat] hit on remote \(targetId) dropped - computed \(damage) health damage (attackComputed defined: \(IsDefined(evt.attackComputed)))");
         return;
     }
+
+    MpFTLog(s"[Combat] reporting \(damage) damage on remote \(targetId)");
 
     // HIT ZONE, read from the game rather than invented.
     //
@@ -221,6 +229,62 @@ public let m_mpServerDowned: Bool;
  * The same Defeated the victim's own game applies to them (MpApplyDownedState), put on the
  * puppet that stands for them here - so everyone sees the one state the server holds.
  */
+/**
+ * Other players' weapons, in their puppets' hands.
+ *
+ * MpPollWeapon has always told the server when we draw, holster and fire, and the server has
+ * always relayed it - but nothing received it, so on every other screen a player's weapon
+ * stayed holstered whatever they did. This puts the weapon they drew in the puppet's right
+ * hand and takes it away when they holster.
+ */
+@addField(ScriptedPuppet)
+public let m_mpHeldWeapon: Uint64;
+
+public func MpApplyRemoteWeapons(network: ref<NetworkWorldSystem>) -> Void {
+    let serverId = network.ConsumeRemoteWeaponEvent();
+
+    while NotEquals(serverId, 0ul) {
+        MpDrawRemoteWeapon(network, serverId, network.GetConsumedWeaponKind(), network.GetConsumedWeaponId());
+        serverId = network.ConsumeRemoteWeaponEvent();
+    }
+}
+
+public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint64, kind: Uint32, weaponId: Uint64) -> Void {
+    let entityId = network.GetEntityIdByServerId(serverId);
+    if !EntityID.IsDefined(entityId) {
+        return;
+    }
+
+    let puppet = GameInstance.FindEntityByID(GetGameInstance(), entityId) as ScriptedPuppet;
+    if !IsDefined(puppet) {
+        return;
+    }
+
+    let transactions = GameInstance.GetTransactionSystem(puppet.GetGame());
+    let slot = t"AttachmentSlots.WeaponRight";
+
+    if Equals(kind, 1u) || Equals(weaponId, 0ul) {
+        if NotEquals(puppet.m_mpHeldWeapon, 0ul) {
+            transactions.RemoveItemFromSlot(puppet, slot);
+            puppet.m_mpHeldWeapon = 0ul;
+            MpFTLog(s"[Weapon] remote \(serverId) holstered");
+        }
+        return;
+    }
+
+    // A shot from the weapon already in hand changes nothing here.
+    if Equals(puppet.m_mpHeldWeapon, weaponId) {
+        return;
+    }
+
+    let item = ItemID.FromTDBID(network.TdbidFromNumber(weaponId));
+    transactions.GiveItem(puppet, item, 1);
+    transactions.AddItemToSlot(puppet, slot, item);
+    puppet.m_mpHeldWeapon = weaponId;
+
+    MpFTLog(s"[Weapon] remote \(serverId) drew \(weaponId)");
+}
+
 public func MpApplyRemoteLifeStates(network: ref<NetworkWorldSystem>) -> Void {
     let serverId = network.ConsumeRemoteLifeChange();
 
@@ -360,6 +424,7 @@ public class MpStatusEffectPoll extends DelayCallback {
                 MpApplyServerHealth(player, network);
                 MpApplyDownedState(player, network);
                 MpApplyRemoteLifeStates(network);
+                MpApplyRemoteWeapons(network);
                 MpApplyIncomingUploads(network);
             }
         }

@@ -104,6 +104,41 @@ public func MpTryMakeHackable(entity: ref<GameObject>) -> Void {
  * god mode on a puppet is logged and left alone, because it would be something to find,
  * not something to paper over.
  */
+/**
+ * Keep remote players out of the game's own combat AI.
+ *
+ * The hostility above is what makes a puppet a target, and it is also what the NPC AI reacts
+ * to: shot at, the puppet went Combat, the engine swapped our movement controller out
+ * (MultiMovement "Detach") and for ~18 seconds the AI moved it - it took cover and acted
+ * like an enemy while the real player stood somewhere else. Relaxed is the state our
+ * controller is attached in, so any other state is sent straight back there.
+ */
+@addField(ScriptedPuppet)
+public let m_mpRelaxCount: Int32;
+
+// The event lives on the reaction manager, not the puppet (probed against 2.5's scripts:
+// ScriptedPuppet, NPCPuppet, NPCStatesComponent and AIHumanComponent have no such method).
+@wrapMethod(ReactionManagerComponent)
+protected cb func OnHighLevelStateDataEvent(evt: ref<gameHighLevelStateDataEvent>) -> Bool {
+    let result = wrappedMethod(evt);
+
+    let puppet = this.GetOwner() as ScriptedPuppet;
+
+    if IsDefined(puppet) && puppet.HasTag(n"CyberpunkMP.Puppet")
+        && NotEquals(evt.currentHighLevelState, gamedataNPCHighLevelState.Relaxed) {
+        puppet.m_mpRelaxCount += 1;
+
+        // First few only: if the AI keeps fighting it, the count says so without a wall.
+        if puppet.m_mpRelaxCount <= 5 {
+            MpFTLog(s"[Hackable] \(EntityID.GetHash(puppet.GetEntityID())) AI went to state \(EnumInt(evt.currentHighLevelState)) - forcing Relaxed (\(puppet.m_mpRelaxCount))");
+        }
+
+        NPCPuppet.ChangeHighLevelState(puppet, gamedataNPCHighLevelState.Relaxed);
+    }
+
+    return result;
+}
+
 public static func MpGodModeRecheckSeconds() -> Float = 1.0
 
 public func MpStripInheritedGodMode(entity: ref<GameObject>) -> Void {

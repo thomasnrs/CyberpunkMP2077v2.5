@@ -314,6 +314,11 @@ public native class NetworkWorldSystem extends IGameSystem {
     public native func GetConsumedLifeState() -> Uint32;
     public native func GetRemoteLifeState(serverId: Uint64) -> Uint32;
 
+    // Other players' weapons - see MpApplyRemoteWeapons.
+    public native func ConsumeRemoteWeaponEvent() -> Uint64;
+    public native func GetConsumedWeaponKind() -> Uint32;
+    public native func GetConsumedWeaponId() -> Uint64;
+
     // Quickhack upload visibility - see Combat.reds. State is read separately because
     // redscript cannot receive a pair from one native call without a struct.
     public native func SendQuickhackUpload(targetId: Uint64, state: Uint32, quickhackId: Uint64, duration: Float) -> Void;

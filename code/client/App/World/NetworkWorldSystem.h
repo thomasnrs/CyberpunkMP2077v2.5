@@ -436,6 +436,13 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     // drawn the way it already is. 0 (alive) when nothing was ever said.
     uint32_t GetRemoteLifeState(uint64_t aServerId) const;
 
+    // Other players drawing and holstering weapons, for MpApplyRemoteWeapons in Combat.reds.
+    // Returns the server id of the next one waiting (0 when none); its kind (0 equip,
+    // 1 unequip, 2 fire, 3/4 reload) and weapon record are left for the two getters.
+    uint64_t ConsumeRemoteWeaponEvent();
+    uint32_t GetConsumedWeaponKind() const { return m_consumedWeaponKind; }
+    uint64_t GetConsumedWeaponId() const { return m_consumedWeaponId; }
+
     // Whether --hackable-puppets was passed. See Hackable.reds.
     bool HackablePuppetsEnabled() const;
 
@@ -510,6 +517,7 @@ protected:
 
     // Health and life state changing without a hit - a spawn, a revive, a correction.
     void HandleCombatState(const PacketEvent<server::NotifyCombatState>& aMessage);
+    void HandleWeaponEvent(const PacketEvent<server::NotifyWeaponEvent>& aMessage);
 
     // Somebody is being quickhacked. Rendered with the game's own BeingHacked state.
     void HandleQuickhackUpload(const PacketEvent<server::NotifyQuickhackUpload>& aMessage);
@@ -865,6 +873,15 @@ private:
     std::unordered_map<uint64_t, uint32_t> m_remoteLifeStates;
     Vector<std::pair<uint64_t, uint32_t>> m_remoteLifeChanges;
     uint32_t m_consumedLifeState{0};
+    struct RemoteWeaponEvent
+    {
+        uint64_t Id;
+        uint32_t Kind;
+        uint64_t WeaponId;
+    };
+    Vector<RemoteWeaponEvent> m_remoteWeaponEvents;
+    uint32_t m_consumedWeaponKind{0};
+    uint64_t m_consumedWeaponId{0};
 
     // Uploads somebody else started, as (server id, state) pairs waiting for script.
     Vector<uint64_t> m_incomingUploads;
@@ -1033,6 +1050,9 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(ConsumeRemoteLifeChange);
     RTTI_METHOD(GetConsumedLifeState);
     RTTI_METHOD(GetRemoteLifeState);
+    RTTI_METHOD(ConsumeRemoteWeaponEvent);
+    RTTI_METHOD(GetConsumedWeaponKind);
+    RTTI_METHOD(GetConsumedWeaponId);
     RTTI_METHOD(SendQuickhackUpload);
     RTTI_METHOD(ConsumeIncomingUploadTarget);
     RTTI_METHOD(GetIncomingUploadState);

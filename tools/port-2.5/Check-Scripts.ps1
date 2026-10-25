@@ -9,11 +9,15 @@
   compiles (its plugins' scripts plus ours) is copied into one temporary tree first, and the
   vanilla bundle is copied beside it so the real cache is never touched.
 
-  Usage:  .\tools\port-2.5\Check-Scripts.ps1 [-Game <Cyberpunk 2077 folder>]
-  On failure scc also shows an error dialog - click OK; the errors are printed here too.
+  Usage:  .\tools\port-2.5\Check-Scripts.ps1 [-Game <Cyberpunk 2077 folder>] [-Extra probe.reds,...]
+  -Extra compiles additional files alongside the mod - a probe that asks whether some game
+  API exists, without touching the mod's own scripts.
+  On failure scc shows an error dialog; it is closed here as soon as it appears, and the
+  errors are printed instead.
 #>
 param(
-    [string]$Game = 'C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077'
+    [string]$Game = 'C:\Program Files (x86)\Steam\steamapps\common\Cyberpunk 2077',
+    [string[]]$Extra = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,9 +32,20 @@ foreach ($plugin in 'ArchiveXL', 'Codeware', 'TweakXL') {
     if (Test-Path $dir) { Copy-Item $dir (Join-Path $scripts "_$plugin") -Recurse }
 }
 Copy-Item (Join-Path $repo 'code\assets\redscript') (Join-Path $scripts '_cpmp') -Recurse
+foreach ($file in $Extra) { Copy-Item $file (Join-Path $scripts '_cpmp') }
 Copy-Item (Join-Path $Game 'r6\cache\final.redscripts') (Join-Path $cache 'final.redscripts')
 
-$output = & (Join-Path $Game 'engine\tools\scc.exe') -compile $scripts (Join-Path $cache 'final.redscripts') 2>&1
+$log = Join-Path $work 'scc.log'
+$scc = Start-Process -FilePath (Join-Path $Game 'engine\tools\scc.exe') -PassThru -NoNewWindow `
+    -ArgumentList '-compile', "`"$scripts`"", "`"$(Join-Path $cache 'final.redscripts')`"" `
+    -RedirectStandardOutput $log -RedirectStandardError "$log.err"
+while (-not $scc.HasExited) {
+    # The failure dialog belongs to scc and would otherwise land on whoever is at the screen.
+    $scc.Refresh()
+    if ($scc.MainWindowHandle -ne 0) { [void]$scc.CloseMainWindow() }
+    Start-Sleep -Milliseconds 100
+}
+$output = @(Get-Content $log, "$log.err" -ErrorAction SilentlyContinue)
 $output | Where-Object { $_ -notmatch '\.reds$' } | ForEach-Object { "$_" }
 
 if ($output -match 'Compilation complete') {
