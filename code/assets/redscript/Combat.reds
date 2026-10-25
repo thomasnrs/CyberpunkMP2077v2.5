@@ -369,9 +369,45 @@ public func MpRemoteFire(puppet: ref<ScriptedPuppet>) -> Void {
     let zero = new Vector4(0.0, 0.0, 0.0, 0.0);
     weapon.AI_ShootForwards(puppet, Cast<Uint16>(0), params, Cast<Uint8>(0), 0.0, zero, zero, zero);
 
+    MpTryRecoil(puppet, weapon);
+
     // Absent after a "firing" line means the call itself is what fails.
     if loud {
         MpFTLog(s"[Weapon] remote \(EntityID.GetHash(puppet.GetEntityID())) fired (shot \(puppet.m_mpShotsSeen))");
+    }
+}
+
+/**
+ * The motion and flash of a remote shot.
+ *
+ * Found by trying candidates on the lab walker with someone watching: single animation
+ * events (Shoot, shoot, fire, EnterHipFire) and the weapon's trigger moved nothing. What
+ * moves the body is the animation graph told it is in combat (AnimFeature_CombatState) plus
+ * the AI's own force-shoot command for a moment - the Relaxed lock in Hackable.reds pulls the
+ * AI back straight after. The flash is the weapon's own trigger effect, and muzzle_flash.
+ */
+@addField(ScriptedPuppet)
+public let m_mpTriggerEffectLogged: Bool;
+
+public func MpTryRecoil(puppet: ref<ScriptedPuppet>, weapon: ref<WeaponObject>) -> Void {
+    let combat = new AnimFeature_CombatState();
+    combat.isInCombat = true;
+    AnimationControllerComponent.ApplyFeatureToReplicate(puppet, n"CombatState", combat);
+
+    let shoot = new AIForceShootCommand();
+    shoot.duration = 0.3;
+    shoot.immediately = true;
+    puppet.GetAIControllerComponent().SendCommand(shoot);
+
+    let trigger = weapon.GetTriggerEffectName();
+    if NotEquals(trigger, n"") && NotEquals(trigger, n"None") {
+        GameObjectEffectHelper.StartEffectEvent(weapon, trigger);
+    }
+    GameObjectEffectHelper.StartEffectEvent(weapon, n"muzzle_flash");
+
+    if !puppet.m_mpTriggerEffectLogged {
+        puppet.m_mpTriggerEffectLogged = true;
+        MpFTLog(s"[Weapon] remote shot effects: trigger '\(NameToString(trigger))' + muzzle_flash");
     }
 }
 
@@ -544,14 +580,37 @@ public func MpDumpFireApi(player: ref<PlayerPuppet>) -> Void {
     MpDumpFunctions(n"WeaponObject", "Fire|Shoot|Muzzle|Effect|Burst|Trigger", false);
     MpDumpFunctions(n"gameweaponObject", "Fire|Shoot|Muzzle|Effect|Burst|Trigger", false);
 
-    let props = Reflection.GetClass(n"FireFXEvent").GetProperties();
-    let text = "";
-    let i = 0;
-    while i < ArraySize(props) {
-        text += s"\(NameToString(props[i].GetName())): \(NameToString(props[i].GetType().GetName())); ";
-        i += 1;
+    MpDumpProps(n"FireFXEvent");
+    // Second round, for the recoil: the AI's own shoot/aim commands and weapon anim features.
+    MpDumpProps(n"AIForceShootCommand");
+    MpDumpProps(n"AIForceShootCommandParams");
+    MpDumpProps(n"AIAimAtTargetCommand");
+    MpDumpProps(n"AIAimAtTargetCommandParams");
+    MpDumpProps(n"AnimFeature_WeaponData");
+    MpDumpProps(n"AnimFeature_CombatState");
+    MpDumpProps(n"AnimFeature_Aim");
+    MpDumpProps(n"AnimFeature_BasicAim");
+}
+
+// Every property of a class and of each class above it, with types.
+public func MpDumpProps(className: CName) -> Void {
+    let cls = Reflection.GetClass(className);
+    if !IsDefined(cls) {
+        MpFTLog(s"[FireApi] no class \(NameToString(className))");
+        return;
     }
-    MpFTLog(s"[FireApi] FireFXEvent { \(text)}");
+
+    while IsDefined(cls) {
+        let props = cls.GetProperties();
+        let text = "";
+        let i = 0;
+        while i < ArraySize(props) {
+            text += s"\(NameToString(props[i].GetName())): \(NameToString(props[i].GetType().GetName())); ";
+            i += 1;
+        }
+        MpFTLog(s"[FireApi] \(NameToString(className)) / \(NameToString(cls.GetName())) { \(text)}");
+        cls = cls.GetParent();
+    }
 }
 
 public func MpDumpFunctions(className: CName, filter: String, statics: Bool) -> Void {
