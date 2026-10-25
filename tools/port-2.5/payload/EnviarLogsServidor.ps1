@@ -29,8 +29,20 @@ foreach ($file in $files | Where-Object { $_ }) {
     if ($file.Length -gt 4MB) { continue }
     $name = [Uri]::EscapeDataString($file.Name)
     $uri = "http://${server}:11778/api/v1/logs/?player=$([Uri]::EscapeDataString($player))&file=$name"
+
+    # Com o jogo aberto, o log da sessao atual esta aberto pelo mod: ReadAllText falhava e o
+    # catch abaixo cancelava o envio de TODOS. Lido compartilhando o arquivo; se mesmo assim
+    # nao der, pula so ele.
     try {
-        Invoke-RestMethod -Method Post -Uri $uri -Body ([IO.File]::ReadAllText($file.FullName)) -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null
+        $stream = [IO.File]::Open($file.FullName, 'Open', 'Read', 'ReadWrite')
+        $reader = New-Object IO.StreamReader($stream)
+        $body = $reader.ReadToEnd()
+        $reader.Close()
+    } catch { continue }
+
+    # Falha de rede: o servidor esta fora, entao nao adianta tentar os outros.
+    try {
+        Invoke-RestMethod -Method Post -Uri $uri -Body $body -ContentType 'text/plain; charset=utf-8' -TimeoutSec 10 | Out-Null
         $sent++
     } catch { break }
 }
