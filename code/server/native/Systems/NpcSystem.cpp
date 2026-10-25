@@ -7,6 +7,7 @@
 #include "Components/NpcComponent.h"
 #include "Components/PlayerComponent.h"
 #include "Components/HealthComponent.h"
+#include "Components/HitboxComponent.h"
 #include "GameServer.h"
 
 #include "Core/Filesystem.h"
@@ -21,6 +22,29 @@ NpcSystem::NpcSystem(gsl::not_null<World*> apWorld)
     , m_statePath(GetPath() / "config" / "npcs.json")
 {
     Load();
+
+    // A hitbox deleted along with its owner's player entity (a disconnect) never goes
+    // through Level::Remove, so nobody would be told to unload it - an invisible body left
+    // standing on every other screen. Tell them here, whichever way it went.
+    m_pWorld->observer<const HitboxComponent>("Hitbox Unload")
+        .event(flecs::OnRemove)
+        .each(
+            [](flecs::entity aHitbox, const HitboxComponent&)
+            {
+                if (!GServer)
+                    return;
+
+                server::NotifyEntityUnload unload;
+                unload.set_id(aHitbox);
+
+                const auto owner = aHitbox.parent();
+                aHitbox.world().each(
+                    [&unload, owner](flecs::entity aPlayer, const PlayerComponent& aPlayerComponent)
+                    {
+                        if (aPlayer != owner)
+                            GServer->Send(aPlayerComponent.Connection, unload);
+                    });
+            });
 
     std::error_code ec;
     const auto walkerFile = GetPath() / "config" / "walker.on";
@@ -40,6 +64,85 @@ NpcSystem::NpcSystem(gsl::not_null<World*> apWorld)
 
         spdlog::warn("[Walker] config/walker.on found - a debug walker ({}) will circle the first player to spawn",
                      m_walkerRecord);
+    }
+}
+
+void NpcSystem::UpdateHitboxes(std::chrono::steady_clock::time_point aNow) noexcept
+{
+    // The owners' clients send at 30/s; following faster than that buys nothing.
+    if (aNow - m_hitboxLastStep < std::chrono::milliseconds(33))
+        return;
+    m_hitboxLastStep = aNow;
+
+    // Who needs one: every player's puppet, and the walker while it wears a player body.
+    struct Owner
+    {
+        flecs::entity Puppet;
+        flecs::entity Parent;
+    };
+    Vector<Owner> owners;
+    m_pWorld->each(
+        [&owners](flecs::entity aPlayer, const PlayerComponent& aPlayerComponent)
+        {
+            if (aPlayerComponent.Puppet && aPlayerComponent.Puppet.is_alive())
+                owners.push_back({aPlayerComponent.Puppet, aPlayer});
+        });
+    if (m_walker && m_walker.is_alive() && m_walkerRecord.find("Muppet") != std::string::npos)
+        owners.push_back({m_walker, {}});
+
+    // Hitboxes whose owner has gone.
+    for (auto it = m_hitboxes.begin(); it != m_hitboxes.end();)
+    {
+        const bool kept = std::any_of(owners.begin(), owners.end(),
+                                      [id = it->first](const Owner& aOwner) { return aOwner.Puppet.id() == id; });
+        if (kept && it->second.is_alive())
+        {
+            ++it;
+            continue;
+        }
+
+        if (it->second.is_alive())
+        {
+            if (auto* pLevel = m_pWorld->get_mut<Level>())
+                pLevel->Remove(it->second);
+        }
+        it = m_hitboxes.erase(it);
+    }
+
+    for (const auto& owner : owners)
+    {
+        const auto* pOwnerMovement = owner.Puppet.get<MovementComponent>();
+        if (!pOwnerMovement || pOwnerMovement->Tick == 0)
+            continue;
+
+        auto& hitbox = m_hitboxes[owner.Puppet.id()];
+        if (!hitbox || !hitbox.is_alive())
+        {
+            hitbox = Spawn(kHitboxRecord, "", pOwnerMovement->Position, pOwnerMovement->Rotation.z, nullptr,
+                           owner.Parent);
+            if (auto* pNpc = hitbox.get_mut<NpcComponent>())
+                pNpc->Transient = true;
+            hitbox.set<HitboxComponent>({owner.Puppet});
+
+            spdlog::info("[Hitbox] {:x} now follows puppet {:x}", hitbox.id(), owner.Puppet.id());
+            continue;
+        }
+
+        const auto* pHitboxMovement = hitbox.get<MovementComponent>();
+        if (!pHitboxMovement || pHitboxMovement->Tick == pOwnerMovement->Tick)
+            continue;
+
+        // The owner's own sample, tick included, so the hitbox interpolates in lockstep
+        // with the puppet on every screen.
+        auto movement = *pHitboxMovement;
+        movement.Position = pOwnerMovement->Position;
+        movement.Rotation = pOwnerMovement->Rotation;
+        movement.Velocity = pOwnerMovement->Velocity;
+        movement.Locomotion = pOwnerMovement->Locomotion;
+        movement.UpperBody = pOwnerMovement->UpperBody;
+        movement.Tick = pOwnerMovement->Tick;
+        ++movement.Sequence;
+        hitbox.set<MovementComponent>(movement);
     }
 }
 
@@ -188,12 +291,16 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
 
 flecs::entity NpcSystem::Spawn(const std::string& acRecord, const std::string& acName,
                                const glm::vec3& acPosition, float aYaw,
-                               const AppearanceComponent* apAppearance) noexcept
+                               const AppearanceComponent* apAppearance, flecs::entity aParent) noexcept
 {
     auto entity = m_pWorld->entity()
                       .set<MovementComponent>({acPosition, {0.f, 0.f, aYaw}, {}})
                       .set<AppearanceComponent>(apAppearance ? *apAppearance : AppearanceComponent{})
                       .set<NpcComponent>({acRecord, acName});
+
+    // Before Level::Add: the parent is who the load broadcast skips.
+    if (aParent)
+        entity.child_of(aParent);
 
     // The same door players walk through: Add tags it as a level actor, broadcasts the
     // load to everyone online, and the join-time sweep hands it to everyone who comes

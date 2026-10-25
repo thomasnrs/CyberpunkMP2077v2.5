@@ -74,12 +74,17 @@ public func MpTryMakeHackable(entity: ref<GameObject>) -> Void {
         return;
     }
 
-    // Toward the local player specifically, rather than a faction or group change. This is
-    // the narrowest form the API offers: it makes this one puppet a valid target for this
-    // one player, and says nothing about how the rest of the world should feel about them.
-    theirs.SetAttitudeTowards(mine, EAIAttitude.AIA_Hostile);
+    // NEUTRAL, no longer hostile. Hostility made the NPC AI fight: shot at, a remote player's
+    // puppet went Combat and the AI drove it for seconds at a time, and the lab walker - armed
+    // and hostile - downed its player twice while the Relaxed lock watched. Shots no longer
+    // need it either: they land on the hitbox (MpSetupHitbox), and the game damages a neutral
+    // NPC the way it damages a pedestrian. The cost is the red reticle, smart-weapon locks and
+    // quickhacks, which all gate on hostility - noted, not solved.
+    // Not friendly either: the game does not let the player damage a friendly NPC, and the
+    // muppet and hitbox records inherit Panam's companion attitude.
+    theirs.SetAttitudeTowards(mine, EAIAttitude.AIA_Neutral);
 
-    MpFTLog(s"[Hackable] \(EntityID.GetHash(entity.GetEntityID())) is now a valid combat and quickhack target");
+    MpFTLog(s"[Hackable] \(EntityID.GetHash(entity.GetEntityID())) set neutral toward us");
 }
 
 /**
@@ -172,6 +177,36 @@ public func MpDumpComponents(entity: ref<Entity>, label: String) -> Void {
 @addField(PlayerPuppet)
 public let m_mpNpcComponentsDumped: Bool;
 
+/**
+ * The hitbox: an invisible real-NPC body the server keeps at a player-body puppet's
+ * position, because shots pass straight through the player's cutscene body. Recognised by
+ * its record; everything that lands on it the server hands to the puppet's owner.
+ */
+public func MpIsHitbox(entity: ref<GameObject>) -> Bool {
+    let puppet = entity as ScriptedPuppet;
+    return IsDefined(puppet) && Equals(puppet.GetRecordID(), t"Character.MpHitbox");
+}
+
+public func MpSetupHitbox(entity: ref<GameObject>) -> Void {
+    if !IsDefined(entity) {
+        return;
+    }
+
+    // Every mesh off, so nothing draws; the hit representation is not a mesh and stays.
+    let components = entity.GetComponents();
+    let hidden = 0;
+    let i = 0;
+    while i < ArraySize(components) {
+        if IsDefined(components[i]) && StrContains(NameToString(components[i].GetClassName()), "Mesh") {
+            components[i].Toggle(false);
+            hidden += 1;
+        }
+        i += 1;
+    }
+
+    MpFTLog(s"[Hitbox] \(EntityID.GetHash(entity.GetEntityID())) set up - \(hidden) mesh component(s) hidden");
+}
+
 public static func MpGodModeRecheckSeconds() -> Float = 1.0
 
 public func MpStripInheritedGodMode(entity: ref<GameObject>) -> Void {
@@ -230,6 +265,11 @@ public class MpGodModeRecheckCallback extends DelayCallback {
         }
         MpClearRecordGodMode(this.entity, "recheck");
         MpDumpComponents(this.entity, s"remote puppet \(EntityID.GetHash(this.entity.GetEntityID()))");
+
+        // Appearance work can switch meshes back on after attach; a hitbox stays hidden.
+        if MpIsHitbox(this.entity) {
+            MpSetupHitbox(this.entity);
+        }
 
         // Streamed in while already down: draw it that way.
         let network = GameInstance.GetNetworkWorldSystem();

@@ -18,7 +18,12 @@ struct NpcSystem
     // Declare one. Broadcasts to everyone in the world immediately; late joiners get
     // it through the same catch-up sweep that shows them the players already online.
     flecs::entity Spawn(const std::string& acRecord, const std::string& acName, const glm::vec3& acPosition,
-                        float aYaw, const struct AppearanceComponent* apAppearance = nullptr) noexcept;
+                        float aYaw, const struct AppearanceComponent* apAppearance = nullptr,
+                        flecs::entity aParent = {}) noexcept;
+
+    // One invisible NPC-body hitbox per player-body puppet (players, and the walker when it
+    // wears a player body), kept at the owner's position. See HitboxComponent.
+    void UpdateHitboxes(std::chrono::steady_clock::time_point aNow) noexcept;
 
     // Remove every declared NPC (and forget them). Each removal broadcasts an unload.
     size_t Clear() noexcept;
@@ -40,6 +45,9 @@ protected:
 private:
     World* m_pWorld;
     std::filesystem::path m_statePath;
+
+    std::unordered_map<uint64_t, flecs::entity> m_hitboxes; // owner puppet id -> hitbox
+    std::chrono::steady_clock::time_point m_hitboxLastStep{};
 
     bool m_walkerEnabled{false};
     std::string m_walkerRecord{"Character.WaMuppet"};

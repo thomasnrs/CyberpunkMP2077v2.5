@@ -204,7 +204,10 @@ void GameServer::OnUpdate()
     ReplicatePendingMovement(now);
 
     if (auto* pNpcs = m_pWorld->get_mut<NpcSystem>())
+    {
         pNpcs->UpdateWalker(now);
+        pNpcs->UpdateHitboxes(now);
+    }
 
     EnforceJail(now);
     ExpireCalls(now);

@@ -274,6 +274,13 @@ protected cb func OnGameAttached() -> Bool {
     // NetworkWorldSystem.OnConnected is for.
     MpArmDeathFloor(this);
 
+    // The combat polls belong to this player's world. A connect made on the main menu
+    // started them in the menu's world, which this attach has just replaced.
+    let network = GameInstance.GetNetworkWorldSystem();
+    if IsDefined(network) && network.IsModEnabled() {
+        MpStartPolls(this);
+    }
+
     return result;
 }
 

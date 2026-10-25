@@ -6,6 +6,7 @@
 #include <Components/AppearanceComponent.h>
 #include <Components/AttachmentComponent.h>
 #include "Components/CellComponent.h"
+#include "Components/HitboxComponent.h"
 #include <Components/CharacterComponent.h>
 #include <Components/VehicleComponent.h>
 #include <Components/AuthorityComponent.h>
@@ -1337,6 +1338,10 @@ void Level::HandleQuickhackRequest(PacketEvent<client::QuickhackRequest>& aMessa
     }
 
     flecs::entity target(GetWorld()->get_world(), aMessage.get_target_id());
+    // A hitbox stands in for a player-body puppet that shots pass through; whatever lands on
+    // it is its owner's (HitboxComponent).
+    if (const auto* pHitbox = target && target.is_alive() ? target.get<HitboxComponent>() : nullptr)
+        target = pHitbox->Owner;
 
     if (!target || !target.is_alive())
     {
@@ -1488,6 +1493,10 @@ void Level::HandleQuickhackUploadRequest(PacketEvent<client::QuickhackUploadRequ
         return;
 
     flecs::entity target(GetWorld()->get_world(), aMessage.get_target_id());
+    // A hitbox stands in for a player-body puppet that shots pass through; whatever lands on
+    // it is its owner's (HitboxComponent).
+    if (const auto* pHitbox = target && target.is_alive() ? target.get<HitboxComponent>() : nullptr)
+        target = pHitbox->Owner;
 
     if (!target || !target.is_alive())
         return;
@@ -1529,6 +1538,10 @@ void Level::HandleStatusEffectRequest(PacketEvent<client::StatusEffectRequest>& 
         return;
 
     flecs::entity target(GetWorld()->get_world(), aMessage.get_target_id());
+    // A hitbox stands in for a player-body puppet that shots pass through; whatever lands on
+    // it is its owner's (HitboxComponent).
+    if (const auto* pHitbox = target && target.is_alive() ? target.get<HitboxComponent>() : nullptr)
+        target = pHitbox->Owner;
 
     if (!target || !target.is_alive())
         return;
@@ -1828,6 +1841,10 @@ void Level::HandleCombatEventRequest(PacketEvent<client::CombatEventRequest>& aM
     }
 
     flecs::entity target(GetWorld()->get_world(), aMessage.get_target_id());
+    // A hitbox stands in for a player-body puppet that shots pass through; whatever lands on
+    // it is its owner's (HitboxComponent).
+    if (const auto* pHitbox = target && target.is_alive() ? target.get<HitboxComponent>() : nullptr)
+        target = pHitbox->Owner;
 
     if (!target || !target.is_alive())
         return;

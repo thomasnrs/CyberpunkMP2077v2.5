@@ -474,9 +474,10 @@ public native class NetworkWorldSystem extends IGameSystem {
         blackboard.SetBool(GetAllBlackboardDefs().UIGameData.UIMultiplayerConnectedToServer, true, true);
 
         // Start draining quickhacks aimed at us. Effects arrive on the network thread into
-        // a native queue; this is the script side visiting it. See Combat.reds.
-        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(new MpStatusEffectPoll(), 0.25, false);
-        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(new MpWeaponPoll(), 0.25, false);
+        // a native queue; this is the script side visiting it. See Combat.reds - the
+        // player's own attach starts them as well, because a connect made on the main menu
+        // schedules them in a world that PLAY then tears down.
+        MpStartPolls(GetPlayer(GetGameInstance()) as PlayerPuppet);
 
         // The usual order is player-attaches-then-connects, so this is where the
         // no-flatline machinery actually takes effect - see Death.reds. Arming it in

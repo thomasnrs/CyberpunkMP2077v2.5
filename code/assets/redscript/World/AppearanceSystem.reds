@@ -228,6 +228,15 @@ public native class AppearanceSystem extends IScriptable {
     private cb func OnEntityAttached(event: ref<EntityLifecycleEvent>) {
         let entity = event.GetEntity() as GameObject;
 
+        // A hitbox is nobody to look at: no appearance, no map pin, no nameplate - just a
+        // body for shots to land on (Hackable.reds MpSetupHitbox).
+        if IsDefined(entity) && MpIsHitbox(entity) {
+            MpSetupHitbox(entity);
+            MpTryMakeHackable(entity);
+            MpStripInheritedGodMode(entity);
+            return;
+        }
+
         if IsDefined(entity) { // && entity.HasTag(n"CyberpunkMP.Puppet") {
             // LogChannel(n"DEBUG", s"[AppearanceSystem] OnEntityAssemble our muppet");
             if this.ApplyAppearance(entity) {

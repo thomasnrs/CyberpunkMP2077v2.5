@@ -409,8 +409,55 @@ public func MpReportStatusEffect(target: ref<ScriptedPuppet>, evt: ref<ApplyStat
  * Drained on a timer rather than an event because the arrival happens on the network
  * thread; the queue is native, and this is script visiting it.
  */
+/**
+ * Start (or restart) both polls for this player, superseding any older pair.
+ *
+ * They used to start only in NetworkWorldSystem.OnConnected. On 2.5 CONNECT happens on the
+ * main menu, which is a world of its own: the polls were scheduled on its delay system and
+ * died with it when PLAY loaded the real world - so after a normal join nothing sent our
+ * weapon, applied the server's health or downs, or drew anyone else's weapon or downed
+ * state. Only a reconnect from inside the world brought them back. Now the player's own
+ * attach starts them too, and each carries its owner and a token so a superseded pair stops.
+ */
+@addField(PlayerPuppet)
+public let m_mpPollToken: Int32;
+
+public func MpStartPolls(player: ref<PlayerPuppet>) -> Void {
+    if !IsDefined(player) {
+        return;
+    }
+
+    player.m_mpPollToken += 1;
+
+    let status = new MpStatusEffectPoll();
+    status.owner = player;
+    status.token = player.m_mpPollToken;
+
+    let weapon = new MpWeaponPoll();
+    weapon.owner = player;
+    weapon.token = player.m_mpPollToken;
+
+    let delays = GameInstance.GetDelaySystem(player.GetGame());
+    delays.DelayCallback(status, 0.25, false);
+    delays.DelayCallback(weapon, 0.25, false);
+
+    MpFTLog(s"[Combat] polls started (token \(player.m_mpPollToken))");
+}
+
+public func MpPollIsCurrent(owner: wref<PlayerPuppet>, token: Int32) -> Bool {
+    return IsDefined(owner) && Equals(owner.m_mpPollToken, token);
+}
+
 public class MpStatusEffectPoll extends DelayCallback {
+    public let owner: wref<PlayerPuppet>;
+    public let token: Int32;
+
     public func Call() -> Void {
+        // Superseded by a newer pair, or its player is gone with its world.
+        if !MpPollIsCurrent(this.owner, this.token) {
+            return;
+        }
+
         let network = GameInstance.GetNetworkWorldSystem();
 
         if !IsDefined(network) {
@@ -442,7 +489,10 @@ public class MpStatusEffectPoll extends DelayCallback {
 
         // Rearmed unconditionally, including while disconnected - the poll has to survive a
         // reconnect, and a callback that stops on the first quiet tick never comes back.
-        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(new MpStatusEffectPoll(), 0.25, false);
+        let again = new MpStatusEffectPoll();
+        again.owner = this.owner;
+        again.token = this.token;
+        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.25, false);
     }
 }
 
@@ -635,7 +685,14 @@ public func MpApplyIncomingUploads(network: ref<NetworkWorldSystem>) -> Void {
  * cost nothing.
  */
 public class MpWeaponPoll extends DelayCallback {
+    public let owner: wref<PlayerPuppet>;
+    public let token: Int32;
+
     public func Call() -> Void {
+        if !MpPollIsCurrent(this.owner, this.token) {
+            return;
+        }
+
         let network = GameInstance.GetNetworkWorldSystem();
 
         if IsDefined(network) && network.IsConnected() {
@@ -643,7 +700,10 @@ public class MpWeaponPoll extends DelayCallback {
         }
 
         // Rearmed unconditionally, so the poll survives a reconnect.
-        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(new MpWeaponPoll(), 0.25, false);
+        let again = new MpWeaponPoll();
+        again.owner = this.owner;
+        again.token = this.token;
+        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.25, false);
     }
 }
 

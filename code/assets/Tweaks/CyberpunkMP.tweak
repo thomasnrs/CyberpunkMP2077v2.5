@@ -359,3 +359,11 @@ Character.WaPanam : Character.Panam {
 	fullDisplayName = "";
 	alternativeDisplayName = "";
 }
+
+// The hitbox. Shots and punches pass straight through the player-body puppets above (not
+// even a hit event), while a real NPC body registers them - so every player-body puppet
+// gets one of these riding along, invisible (Hackable.reds MpSetupHitbox), and the server
+// hands whatever lands on it to the puppet's owner (HitboxComponent).
+Character.MpHitbox : Character.WaPanam {
+	priority = "SpawnableObjectPriority.Regular";
+}
