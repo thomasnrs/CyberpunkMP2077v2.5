@@ -50,6 +50,29 @@ public class MpWorldNpcService extends ScriptableService {
         ArrayPush(this.npcs, npc);
         ArrayPush(this.lastPositions, npc.GetWorldPosition());
         ArrayPush(this.lastTimes, -1.0);
+
+        // The game streams NPCs out and back in as fresh objects; waiting for the next
+        // half-second pass showed each one for a moment every time it came back - the flicker.
+        // Hidden on arrival if a host copy already stands near.
+        if this.IsNearMirror(npc.GetWorldPosition()) {
+            let player = GetPlayer(npc.GetGame());
+            if IsDefined(player) && !npc.IsCrowd() {
+                MpSetWorldSyncHidden(npc, player, true);
+            }
+        }
+    }
+
+    public func IsNearMirror(position: Vector4) -> Bool {
+        let range = MpWorldSyncHideRange();
+        let i = 0;
+        while i < ArraySize(this.mirrors) {
+            let mirror = this.mirrors[i];
+            if IsDefined(mirror) && mirror.IsAttached() && Vector4.Distance(position, mirror.GetWorldPosition()) <= range {
+                return true;
+            }
+            i += 1;
+        }
+        return false;
     }
 
     public static func Get() -> ref<MpWorldNpcService> {
