@@ -290,6 +290,7 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
         if NotEquals(puppet.m_mpHeldWeapon, 0ul) {
             transactions.RemoveItemFromSlot(puppet, slot);
             puppet.m_mpHeldWeapon = 0ul;
+            MpSetCombatStance(puppet, false);
             MpFTLog(s"[Weapon] remote \(serverId) holstered");
         }
         return;
@@ -312,8 +313,24 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
     transactions.GiveItem(puppet, item, 1);
     transactions.AddItemToSlot(puppet, slot, item);
     puppet.m_mpHeldWeapon = weaponId;
+    MpSetCombatStance(puppet, true);
 
     MpFTLog(s"[Weapon] remote \(serverId) drew \(weaponId)");
+}
+
+/**
+ * Weapon up or down, on the animation side only.
+ *
+ * A puppet holding a gun still walked and stood relaxed, and its shots came out of a
+ * lowered weapon. NPCs raise theirs through the high-level state's anim wrapper - the AI
+ * weights "combatLocomotion" when it enters Combat (NPCStatesComponent.
+ * GetAnimWrapperNameBasedOnHighLevelState). Putting the puppet's AI in Combat is what made
+ * it fight on its own, so only the wrapper is set: the pose, without the behaviour.
+ */
+public func MpSetCombatStance(puppet: ref<ScriptedPuppet>, on: Bool) -> Void {
+    let wrapper = NPCStatesComponent.GetAnimWrapperNameBasedOnHighLevelState(gamedataNPCHighLevelState.Combat);
+    AnimationControllerComponent.SetAnimWrapperWeightOnOwnerAndItems(puppet, wrapper, on ? 1.0 : 0.0);
+    MpFTLog(s"[Weapon] \(EntityID.GetHash(puppet.GetEntityID())) stance \(NameToString(wrapper)) \(on ? "up" : "down")");
 }
 
 /**
