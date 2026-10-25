@@ -524,6 +524,28 @@ message CallControlRequest {
     uint32 action = 2;
 }
 
+/**
+ * World sync, host model: the world host's game keeps simulating the city's NPCs and reports
+ * the ones near players; the server mirrors each as an entity every other client renders.
+ */
+message WorldNpcState {
+    // The host's own entity hash for it - the key while it stays spawned on the host.
+    uint64 local_id = 1;
+    // TweakDBID of its character record.
+    uint64 record = 2;
+    common.Vector3 position = 3;
+    float rotation = 4;
+    float speed = 5;
+    // 0 alive, 2 dead.
+    uint32 life_state = 6;
+}
+
+message WorldNpcReport {
+    bool unreliable = 1000;
+    uint64 tick = 1;
+    repeated WorldNpcState npcs = 2;
+}
+
 message Protocol {
     oneof content {
         AuthenticationRequest authentication_request = 1;
@@ -548,5 +570,6 @@ message Protocol {
         CallRequest call_request = 20;
         CallControlRequest call_control_request = 21;
         LeaveWorldRequest leave_world_request = 22;
+        WorldNpcReport world_npc_report = 23;
     }
 }

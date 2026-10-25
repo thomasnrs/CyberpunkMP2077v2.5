@@ -2425,6 +2425,51 @@ void NetworkWorldSystem::HandleWeaponEvent(const PacketEvent<server::NotifyWeapo
     m_remoteWeaponEvents.push_back({aMessage.get_id(), kind, aMessage.get_weapon_id()});
 }
 
+void NetworkWorldSystem::HandleWorldHost(const PacketEvent<server::NotifyWorldHost>& aMessage)
+{
+    if (m_isWorldHost != aMessage.get_is_host())
+        spdlog::info("[WorldNpc] we are {} the world host", aMessage.get_is_host() ? "now" : "no longer");
+
+    m_isWorldHost = aMessage.get_is_host();
+}
+
+void NetworkWorldSystem::ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw,
+                                        float aSpeed, uint32_t aLifeState)
+{
+    client::WorldNpcState state;
+    state.set_local_id(aLocalId);
+    state.set_record(aRecord);
+
+    common::Vector3 position;
+    position.set_x(aPosition.X);
+    position.set_y(aPosition.Y);
+    position.set_z(aPosition.Z);
+    state.set_position(position);
+
+    state.set_rotation(aYaw);
+    state.set_speed(aSpeed);
+    state.set_life_state(aLifeState);
+
+    m_pendingWorldNpcs.push_back(state);
+}
+
+void NetworkWorldSystem::FlushWorldNpcReport()
+{
+    const auto service = Core::Container::Get<NetworkService>();
+    if (m_pendingWorldNpcs.empty() || !service || !service->IsConnected() || !m_isWorldHost)
+    {
+        m_pendingWorldNpcs.clear();
+        return;
+    }
+
+    client::WorldNpcReport report;
+    report.set_tick(GetTick());
+    report.set_npcs(m_pendingWorldNpcs);
+    service->Send(report);
+
+    m_pendingWorldNpcs.clear();
+}
+
 uint64_t NetworkWorldSystem::ConsumeRemoteWeaponEvent()
 {
     if (m_remoteWeaponEvents.empty())
@@ -2807,8 +2852,14 @@ void NetworkWorldSystem::HandleCharacterLoad(const PacketEvent<server::NotifyCha
 
     auto ccstate = aMessage.get_ccstate();
 
+    // A world NPC mirror names its record by TweakDBID only; "#<number>" tells CreatePuppet
+    // (NetworkWorldSystem.reds) to take it as one instead of a record name.
+    const std::string record = aMessage.get_puppet_record_id() != 0
+                                   ? fmt::format("#{}", aMessage.get_puppet_record_id())
+                                   : std::string(aMessage.get_puppet_record().c_str());
+
     Spawn(aMessage.get_id(), position, rotation, equipment, ccstate, aMessage.get_is_male(),
-          aMessage.get_username().c_str(), aMessage.get_puppet_record().c_str());
+          aMessage.get_username().c_str(), record.c_str());
 }
 
 void NetworkWorldSystem::HandleEntityUnload(const PacketEvent<server::NotifyEntityUnload>& aMessage)
@@ -3929,6 +3980,7 @@ void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleDamageResult>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCombatState>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWeaponEvent>(this);
+    pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWorldHost>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleQuickhackUpload>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleVehicleControlAssigned>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCharacterList>(this);

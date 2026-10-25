@@ -279,6 +279,16 @@ message NotifyCharacterLoad {
     uint32 sequence = 13;
     uint32 authority_epoch = 14;
     bool correction = 15;
+    // A world NPC mirrored from the world host: the record as a TweakDBID, because the host
+    // only has the number (record names cannot be read back from TweakDB in a retail game).
+    // Takes precedence over puppet_record when set.
+    uint64 puppet_record_id = 16;
+}
+
+// Whether this client is the world host - the one whose game simulates the city's NPCs for
+// everybody (WorldNpcSystem). Sent on join and whenever the host changes.
+message NotifyWorldHost {
+    bool is_host = 1;
 }
 
 message NotifyVehicleLoad {
@@ -746,5 +756,6 @@ message Protocol {
         NotifyQuickhackResult notify_quickhack_result = 31;
         NotifyPossessions notify_possessions = 32;
         NotifyCall notify_call = 33;
+        NotifyWorldHost notify_world_host = 34;
     }
 }

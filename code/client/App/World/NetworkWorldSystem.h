@@ -430,6 +430,14 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     // Our own life state as the server last gave it: 0 alive, 1 downed, 2 dead, 3 reviving.
     uint32_t GetOwnLifeState() const { return m_ownLifeState; }
 
+    // World sync, host model (WorldNpcSystem on the server). Whether our game is the one
+    // simulating the city's NPCs for everybody, and the report script builds when it is:
+    // one ReportWorldNpc per NPC near us, then FlushWorldNpcReport sends them together.
+    bool IsWorldHost() const { return m_isWorldHost; }
+    void ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw, float aSpeed,
+                        uint32_t aLifeState);
+    void FlushWorldNpcReport();
+
     // Life-state changes of OTHER combatants, for drawing them down or back up. Returns the
     // server id of the next one waiting (0 when none) and leaves its new state for
     // GetConsumedLifeState. See MpApplyRemoteLifeStates in Combat.reds.
@@ -521,6 +529,7 @@ protected:
     // Health and life state changing without a hit - a spawn, a revive, a correction.
     void HandleCombatState(const PacketEvent<server::NotifyCombatState>& aMessage);
     void HandleWeaponEvent(const PacketEvent<server::NotifyWeaponEvent>& aMessage);
+    void HandleWorldHost(const PacketEvent<server::NotifyWorldHost>& aMessage);
 
     // Somebody is being quickhacked. Rendered with the game's own BeingHacked state.
     void HandleQuickhackUpload(const PacketEvent<server::NotifyQuickhackUpload>& aMessage);
@@ -873,6 +882,8 @@ private:
     float m_incomingHealth{-1.f};
     bool m_downed{false};
     uint32_t m_ownLifeState{0};
+    bool m_isWorldHost{false};
+    Vector<client::WorldNpcState> m_pendingWorldNpcs;
     void NoteRemoteLifeState(uint64_t aServerId, uint32_t aState);
     std::unordered_map<uint64_t, uint32_t> m_remoteLifeStates;
     Vector<std::pair<uint64_t, uint32_t>> m_remoteLifeChanges;
@@ -1052,6 +1063,9 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(ConsumeIncomingHealth);
     RTTI_METHOD(IsDowned);
     RTTI_METHOD(GetOwnLifeState);
+    RTTI_METHOD(IsWorldHost);
+    RTTI_METHOD(ReportWorldNpc);
+    RTTI_METHOD(FlushWorldNpcReport);
     RTTI_METHOD(ConsumeRemoteLifeChange);
     RTTI_METHOD(GetConsumedLifeState);
     RTTI_METHOD(GetRemoteLifeState);

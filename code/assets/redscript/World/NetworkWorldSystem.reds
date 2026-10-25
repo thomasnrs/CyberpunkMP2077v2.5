@@ -311,6 +311,11 @@ public native class NetworkWorldSystem extends IGameSystem {
     // 0 alive, 1 downed, 2 dead, 3 reviving - as the server last said.
     public native func GetOwnLifeState() -> Uint32;
 
+    // World sync, host model - see WorldSync.reds.
+    public native func IsWorldHost() -> Bool;
+    public native func ReportWorldNpc(localId: Uint64, record: Uint64, position: Vector4, yaw: Float, speed: Float, lifeState: Uint32) -> Void;
+    public native func FlushWorldNpcReport() -> Void;
+
     // Other combatants going down or getting up - see MpApplyRemoteLifeStates.
     public native func ConsumeRemoteLifeChange() -> Uint64;
     public native func GetConsumedLifeState() -> Uint32;
@@ -537,7 +542,14 @@ public native class NetworkWorldSystem extends IGameSystem {
         // An empty or misspelt record would produce an invalid id and spawn nothing at
         // all, which looks exactly like the other player never joining. Fall back to the
         // mannequin, which is at least known to work.
-        let id = TDBID.Create(record);
+        // "#<number>": a world NPC mirror, whose record the host could only send as a
+        // TweakDBID (record names cannot be read back from TweakDB in a retail game).
+        let id: TweakDBID;
+        if StrBeginsWith(record, "#") {
+            id = this.TdbidFromNumber(StringToUint64(StrMid(record, 1)));
+        } else {
+            id = TDBID.Create(record);
+        }
         if !TDBID.IsValid(id) {
             MpFTLogError(s"[NetworkWorldSystem] no such record '\(record)' - falling back to the muppet");
             id = isMale ? t"Character.MaMuppet" : t"Character.WaMuppet";

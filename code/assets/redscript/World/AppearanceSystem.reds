@@ -243,6 +243,12 @@ public native class AppearanceSystem extends IScriptable {
                 ArrayPush(this.m_entities, entity);
             }
 
+            // Map pins are for players. World NPC mirrors and server NPCs are built from
+            // their own records; only the player bodies get the remote-player marker.
+            let rec = (entity as ScriptedPuppet).GetRecordID();
+            let isPlayerBody = Equals(rec, t"Character.MaMuppet") || Equals(rec, t"Character.WaMuppet")
+                || Equals(rec, t"Character.Player_Puppet_Base");
+
             let mappinData: MappinData;
             let mappinSystem: ref<MappinSystem> = GameInstance.GetMappinSystem(GetGameInstance());
             mappinData.mappinType = t"Mappins.CPO_RemotePlayerMappinDefinition";
@@ -255,7 +261,9 @@ public native class AppearanceSystem extends IScriptable {
             mappinData.active = true;
             // mappinData.visibleThroughWalls = true;
             // might need to adjust up a bit?
-            mappinSystem.RegisterMappinWithObject(mappinData, entity, n"Nameplate");
+            if isPlayerBody {
+                mappinSystem.RegisterMappinWithObject(mappinData, entity, n"Nameplate");
+            }
 
             MpTryMakeHackable(entity);
             MpStripInheritedGodMode(entity);

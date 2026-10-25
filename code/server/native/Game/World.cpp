@@ -15,6 +15,7 @@
 
 #include "Systems/ChatSystem.h"
 #include "Systems/NpcSystem.h"
+#include "Systems/WorldNpcSystem.h"
 #include "Systems/ServerListSystem.h"
 
 World::World(const FlecsConfig& acFlecsConfig)
@@ -26,6 +27,7 @@ World::World(const FlecsConfig& acFlecsConfig)
     emplace<WorldClock>(this);
     emplace<ChatSystem>(this);
     emplace<NpcSystem>(this);
+    emplace<WorldNpcSystem>(this);
     emplace<ServerListSystem>(this);
 
     if (acFlecsConfig.IsEnabled())

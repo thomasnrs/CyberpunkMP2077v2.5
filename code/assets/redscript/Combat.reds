@@ -598,9 +598,14 @@ public func MpStartPolls(player: ref<PlayerPuppet>) -> Void {
     weapon.owner = player;
     weapon.token = player.m_mpPollToken;
 
+    let worldNpcs = new MpWorldNpcReportPoll();
+    worldNpcs.owner = player;
+    worldNpcs.token = player.m_mpPollToken;
+
     let delays = GameInstance.GetDelaySystem(player.GetGame());
     delays.DelayCallback(status, 0.25, false);
     delays.DelayCallback(weapon, 0.25, false);
+    delays.DelayCallback(worldNpcs, 0.25, false);
 
     MpFTLog(s"[Combat] polls started (token \(player.m_mpPollToken))");
     MpDumpFireApi(player);

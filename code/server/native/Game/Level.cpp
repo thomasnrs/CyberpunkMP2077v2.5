@@ -7,6 +7,7 @@
 #include <Components/AttachmentComponent.h>
 #include "Components/CellComponent.h"
 #include "Components/HitboxComponent.h"
+#include "Components/WorldNpcComponent.h"
 #include <Components/CharacterComponent.h>
 #include <Components/VehicleComponent.h>
 #include <Components/AuthorityComponent.h>
@@ -2628,10 +2629,17 @@ server::NotifyCharacterLoad Level::Serialize(flecs::entity aEntity) noexcept
         message.set_username(pNpcComponent->Name.c_str());
     }
 
+    // A mirror of the world host's NPC carries its record as the TweakDBID the host read.
+    if (const auto* pWorldNpc = aEntity.get<WorldNpcComponent>())
+        message.set_puppet_record_id(pWorldNpc->RecordId);
+
     // The name lives on the PLAYER, not the puppet - the puppet is a child entity with no
     // idea who owns it. Server-side and Discord-derived, so it cannot be spoofed by a
     // client claiming to be someone else.
-    if (const auto owner = aEntity.parent())
+    //
+    // Not for NPC entities parented to a player (a hitbox, a world NPC mirror): they are
+    // children for the owner-skip only and are nobody's character.
+    if (const auto owner = aEntity.parent(); owner && !aEntity.has<NpcComponent>())
     {
         if (const auto* pPlayerComponent = owner.get<PlayerComponent>())
         {
