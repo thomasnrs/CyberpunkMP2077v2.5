@@ -73,13 +73,21 @@ Red::vehicle::RigidBody* Game::Probe::VehicleRigidBody(Red::vehicle::BaseObject*
             continue;
         }
 
-        const auto& q = pBody->orientation;
+        // Judged by currentTransform - position AND orientation - because that and velocity are
+        // all the sync reads (NetworkWorldSystem). It used to judge the separate `orientation`
+        // field at 0x30, which on 2.5 read 0.001 on a car just entered while currentTransform
+        // sat 0.00m from the entity: the right body refused, and vehicle position sync was
+        // switched off for the session - every remote car stood still.
+        const auto& q = pBody->currentTransform.Orientation;
         const float norm = std::sqrt(q.i * q.i + q.j * q.j + q.k * q.k + q.r * q.r);
+        const auto& qs = pBody->orientation;
+        const float separateNorm = std::sqrt(qs.i * qs.i + qs.j * qs.j + qs.k * qs.k + qs.r * qs.r);
         const auto bodyPosition = Game::ToGlm(pBody->currentTransform.Position);
         const float distance = glm::distance(bodyPosition, entityPosition);
 
-        spdlog::info("[Probe] vehicle rigidBody @0x{:X}: |orientation| = {:.3f}, {:.2f} m from the entity", offset,
-                     norm, distance);
+        spdlog::info("[Probe] vehicle rigidBody @0x{:X}: |currentTransform.orientation| = {:.3f} (separate field {:.3f}), "
+                     "{:.2f} m from the entity",
+                     offset, norm, separateNorm, distance);
 
         if (std::abs(norm - 1.f) < 0.02f && distance < 5.f)
         {

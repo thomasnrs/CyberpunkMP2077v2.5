@@ -17,6 +17,7 @@
 #include "App/World/PuppetRegistry.h"
 #include "App/World/ServerIdRegistry.h"
 #include "App/World/FlecsThread.h"
+#include "App/Threading/ThreadService.h"
 
 
 // Puts a network vehicle fully under remote control: no local player input, no local
@@ -483,6 +484,15 @@ bool VehicleSystem::HandleVehicleEnterMessage(const PacketEvent<server::NotifyVe
 }
 
 void VehicleSystem::OnVehicleReady(const Red::EntityID& aVehicleEntityId)
+{
+    // Entity/Attached is delivered on a job thread, and everything below goes through flecs:
+    // the first 2.5 sessions that ever reached here logged "touched flecs OFF the flecs
+    // thread" for every car - the same race that crashed clients before. Only the id
+    // crosses over; the vehicle is re-resolved on the main thread.
+    ThreadService::RunInMainThread([this, id = aVehicleEntityId] { OnVehicleReadyMain(id); });
+}
+
+void VehicleSystem::OnVehicleReadyMain(Red::EntityID aVehicleEntityId)
 {
     spdlog::info("[VehicleSystem] OnVehicleReady");
 

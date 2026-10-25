@@ -28,6 +28,8 @@ protected:
     void OnVehicleEnter(Red::EntityID aVehicle, const Red::TweakDBID& aVehicleTdbid, Red::CName aName, const Red::Vector4& aPostion, const Red::Quaternion& aOrientation);
     void OnVehicleExit();
     void OnVehicleReady(const Red::EntityID& vehicle);
+    // The work itself, on the main thread - see OnVehicleReady.
+    void OnVehicleReadyMain(Red::EntityID aVehicleEntityId);
 
     bool HandleVehicleLoadMessage(const PacketEvent<server::NotifyVehicleLoad>& aMessage);
     bool HandleVehicleEnterMessage(const PacketEvent<server::NotifyVehicleEnter>& aMessage);

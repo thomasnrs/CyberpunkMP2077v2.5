@@ -3305,17 +3305,30 @@ void NetworkWorldSystem::UpdatePlayerLocation() const
         }
         if (auto remote_id = GetVehicleSystem()->GetVehicleRemoteId(); remote_id != std::nullopt)
         {
+            // The physics body when its layout is confirmed (it carries the velocity too); the
+            // entity's own world transform otherwise. A failed probe used to return here and
+            // stop sending entirely - the car stood still on every other screen.
             auto* pRigidBody = Game::Probe::VehicleRigidBody(vehicle);
-            if (!pRigidBody)
-                return;
 
             auto transform = Red::WorldTransform();
+            float speed = 0.f;
 
-            transform = pRigidBody->currentTransform;
+            if (pRigidBody)
+            {
+                transform = pRigidBody->currentTransform;
+                speed = pRigidBody->velocity.Magnitude();
+            }
+            else if (vehicle->placedComponent)
+            {
+                transform = vehicle->placedComponent->worldTransform;
+            }
+            else
+            {
+                return;
+            }
 
             const auto cEntityPosition = transform.Position;
             const auto cEntityRotation = eulerAngles(Game::ToGlm(transform.Orientation));
-            float speed = pRigidBody->velocity.Magnitude();
 
             common::Vector3 pos;
             pos.set_x(cEntityPosition.x);
