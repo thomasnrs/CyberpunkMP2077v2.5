@@ -2433,6 +2433,24 @@ void NetworkWorldSystem::HandleWorldHost(const PacketEvent<server::NotifyWorldHo
     m_isWorldHost = aMessage.get_is_host();
 }
 
+void NetworkWorldSystem::HandleWorldNpcDamage(const PacketEvent<server::NotifyWorldNpcDamage>& aMessage)
+{
+    // Applied by script (WorldSync.reds), which holds the NPCs; this is the network thread.
+    m_worldNpcDamage.push_back({aMessage.get_local_id(), aMessage.get_damage()});
+}
+
+uint64_t NetworkWorldSystem::ConsumeWorldNpcDamage()
+{
+    if (m_worldNpcDamage.empty())
+        return 0;
+
+    const auto [id, damage] = m_worldNpcDamage.front();
+    m_worldNpcDamage.erase(m_worldNpcDamage.begin());
+
+    m_consumedWorldNpcDamage = damage;
+    return id;
+}
+
 void NetworkWorldSystem::ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw,
                                         float aSpeed, uint32_t aLifeState)
 {
@@ -3981,6 +3999,7 @@ void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCombatState>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWeaponEvent>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWorldHost>(this);
+    pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWorldNpcDamage>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleQuickhackUpload>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleVehicleControlAssigned>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCharacterList>(this);

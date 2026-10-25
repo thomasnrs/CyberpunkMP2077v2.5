@@ -150,7 +150,15 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     let maxHealth = GameInstance.GetStatPoolsSystem(target.GetGame())
         .GetStatPoolMaxPointValue(Cast<StatsObjectID>(player.GetEntityID()), gamedataStatPoolType.Health);
     let raw = damage;
-    if maxHealth > 0.0 {
+
+    // Players (their hitboxes and bodies) share the server's 0..100 pool. A world NPC mirror
+    // does not: the hit goes to the host's real NPC, of the same record, so it travels as
+    // the raw hit points this game computed against the mirror.
+    let rec = target.GetRecordID();
+    let isPlayer = Equals(rec, t"Character.MaMuppet") || Equals(rec, t"Character.WaMuppet")
+        || Equals(rec, t"Character.Player_Puppet_Base") || Equals(rec, t"Character.MpHitbox");
+
+    if isPlayer && maxHealth > 0.0 {
         damage = raw * 100.0 / maxHealth;
     }
 

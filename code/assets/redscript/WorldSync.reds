@@ -45,6 +45,34 @@ public class MpWorldNpcService extends ScriptableService {
     }
 }
 
+/**
+ * Hits other players landed on the mirrors of our NPCs, forwarded by the server: applied to
+ * the real NPC here, the one simulation that counts. If it dies, the next report says so and
+ * every mirror goes down with it.
+ */
+public func MpApplyWorldNpcDamage(network: ref<NetworkWorldSystem>, service: ref<MpWorldNpcService>, player: ref<PlayerPuppet>) -> Void {
+    let localId = network.ConsumeWorldNpcDamage();
+
+    while NotEquals(localId, 0ul) {
+        let damage = network.GetConsumedWorldNpcDamage();
+        let applied = false;
+
+        let i = 0;
+        while i < ArraySize(service.npcs) && !applied {
+            let npc = service.npcs[i];
+            if IsDefined(npc) && Equals(Cast<Uint64>(EntityID.GetHash(npc.GetEntityID())), localId) {
+                GameInstance.GetStatPoolsSystem(npc.GetGame()).RequestChangingStatPoolValue(
+                    Cast<StatsObjectID>(npc.GetEntityID()), gamedataStatPoolType.Health, -damage, player, false, false);
+                applied = true;
+            }
+            i += 1;
+        }
+
+        MpFTLog(s"[WorldNpc] a mirror of NPC \(localId) was hit for \(damage) - \(applied ? "applied to it" : "no such NPC here any more")");
+        localId = network.ConsumeWorldNpcDamage();
+    }
+}
+
 public static func MpWorldNpcRange() -> Float = 60.0
 public static func MpWorldNpcMaxPerReport() -> Int32 = 40
 
@@ -76,6 +104,8 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
     if !IsDefined(service) {
         return;
     }
+
+    MpApplyWorldNpcDamage(network, service, player);
 
     let now = EngineTime.ToFloat(GameInstance.GetSimTime(player.GetGame()));
     let center = player.GetWorldPosition();

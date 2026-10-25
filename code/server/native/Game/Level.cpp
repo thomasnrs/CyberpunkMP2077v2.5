@@ -1883,6 +1883,30 @@ void Level::HandleCombatEventRequest(PacketEvent<client::CombatEventRequest>& aM
     if (!target || !target.is_alive())
         return;
 
+    // The mirror of a world host's NPC: its health lives in the host's game, so the hit goes
+    // there (raw hit points, see NotifyWorldNpcDamage) and the death comes back by report.
+    if (const auto* pWorldNpc = target.get<WorldNpcComponent>())
+    {
+        const float raw = aMessage.get_reported_damage();
+        if (!std::isfinite(raw) || raw <= 0.f)
+            return;
+
+        pAttackerHealth->LastCombatSequence = aMessage.get_sequence();
+        pAttackerHealth->HasCombatSequence = true;
+
+        if (const auto* pHost = pWorldNpc->Host ? pWorldNpc->Host.get<PlayerComponent>() : nullptr)
+        {
+            server::NotifyWorldNpcDamage forward;
+            forward.set_local_id(pWorldNpc->LocalId);
+            forward.set_damage(std::min(raw, 1000000.f));
+            GServer->Send(pHost->Connection, forward);
+        }
+
+        spdlog::info("[WorldNpc] {} hit mirror {:x} (host NPC {:x}) for {:.1f} - forwarded to the host",
+                     pAttackerComponent->Username, target.id(), pWorldNpc->LocalId, raw);
+        return;
+    }
+
     auto* pTargetHealth = target.get_mut<HealthComponent>();
     if (!pTargetHealth)
         return;

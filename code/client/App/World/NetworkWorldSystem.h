@@ -437,6 +437,10 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     void ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw, float aSpeed,
                         uint32_t aLifeState);
     void FlushWorldNpcReport();
+    // Hits on mirrors of our NPCs, forwarded by the server while we are host: the next
+    // NPC's local id (0 when none), its damage left for GetConsumedWorldNpcDamage.
+    uint64_t ConsumeWorldNpcDamage();
+    float GetConsumedWorldNpcDamage() const { return m_consumedWorldNpcDamage; }
 
     // Life-state changes of OTHER combatants, for drawing them down or back up. Returns the
     // server id of the next one waiting (0 when none) and leaves its new state for
@@ -530,6 +534,7 @@ protected:
     void HandleCombatState(const PacketEvent<server::NotifyCombatState>& aMessage);
     void HandleWeaponEvent(const PacketEvent<server::NotifyWeaponEvent>& aMessage);
     void HandleWorldHost(const PacketEvent<server::NotifyWorldHost>& aMessage);
+    void HandleWorldNpcDamage(const PacketEvent<server::NotifyWorldNpcDamage>& aMessage);
 
     // Somebody is being quickhacked. Rendered with the game's own BeingHacked state.
     void HandleQuickhackUpload(const PacketEvent<server::NotifyQuickhackUpload>& aMessage);
@@ -884,6 +889,8 @@ private:
     uint32_t m_ownLifeState{0};
     bool m_isWorldHost{false};
     Vector<client::WorldNpcState> m_pendingWorldNpcs;
+    Vector<std::pair<uint64_t, float>> m_worldNpcDamage;
+    float m_consumedWorldNpcDamage{0.f};
     void NoteRemoteLifeState(uint64_t aServerId, uint32_t aState);
     std::unordered_map<uint64_t, uint32_t> m_remoteLifeStates;
     Vector<std::pair<uint64_t, uint32_t>> m_remoteLifeChanges;
@@ -1066,6 +1073,8 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(IsWorldHost);
     RTTI_METHOD(ReportWorldNpc);
     RTTI_METHOD(FlushWorldNpcReport);
+    RTTI_METHOD(ConsumeWorldNpcDamage);
+    RTTI_METHOD(GetConsumedWorldNpcDamage);
     RTTI_METHOD(ConsumeRemoteLifeChange);
     RTTI_METHOD(GetConsumedLifeState);
     RTTI_METHOD(GetRemoteLifeState);

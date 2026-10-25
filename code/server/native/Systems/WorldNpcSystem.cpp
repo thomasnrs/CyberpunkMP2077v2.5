@@ -160,9 +160,14 @@ void WorldNpcSystem::HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& a
 
     for (const auto& npc : aMessage.get_npcs())
     {
-        const glm::vec3 position{npc.get_position().get_x(), npc.get_position().get_y(), npc.get_position().get_z()};
+        glm::vec3 position{npc.get_position().get_x(), npc.get_position().get_y(), npc.get_position().get_z()};
         if (!std::isfinite(position.x) || !std::isfinite(position.y) || !std::isfinite(position.z))
             continue;
+
+        // Echoed to the host, the copy would stand inside the original - two metres aside
+        // so one person can tell them apart and shoot the copy on purpose.
+        if (m_echo)
+            position.x += 2.f;
 
         auto found = m_mirrors.find(npc.get_local_id());
         if (found == m_mirrors.end())

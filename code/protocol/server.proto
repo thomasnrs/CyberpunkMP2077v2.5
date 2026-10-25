@@ -291,6 +291,16 @@ message NotifyWorldHost {
     bool is_host = 1;
 }
 
+// To the world host: somebody hit the mirror of one of its NPCs. The host applies it to the
+// real NPC, and its death comes back through the next WorldNpcReport.
+message NotifyWorldNpcDamage {
+    // The host's own id for the NPC (WorldNpcState.local_id).
+    uint64 local_id = 1;
+    // Raw hit points, as the attacker's game computed them against the mirror - the same
+    // record as the original, so the same scale.
+    float damage = 2;
+}
+
 message NotifyVehicleLoad {
     uint64 id = 1;
     common.Vector3 position = 2;
@@ -757,5 +767,6 @@ message Protocol {
         NotifyPossessions notify_possessions = 32;
         NotifyCall notify_call = 33;
         NotifyWorldHost notify_world_host = 34;
+        NotifyWorldNpcDamage notify_world_npc_damage = 35;
     }
 }

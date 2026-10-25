@@ -315,6 +315,8 @@ public native class NetworkWorldSystem extends IGameSystem {
     public native func IsWorldHost() -> Bool;
     public native func ReportWorldNpc(localId: Uint64, record: Uint64, position: Vector4, yaw: Float, speed: Float, lifeState: Uint32) -> Void;
     public native func FlushWorldNpcReport() -> Void;
+    public native func ConsumeWorldNpcDamage() -> Uint64;
+    public native func GetConsumedWorldNpcDamage() -> Float;
 
     // Other combatants going down or getting up - see MpApplyRemoteLifeStates.
     public native func ConsumeRemoteLifeChange() -> Uint64;
