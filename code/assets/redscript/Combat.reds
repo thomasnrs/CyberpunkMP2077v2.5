@@ -454,6 +454,91 @@ public func MpStartPolls(player: ref<PlayerPuppet>) -> Void {
     delays.DelayCallback(weapon, 0.25, false);
 
     MpFTLog(s"[Combat] polls started (token \(player.m_mpPollToken))");
+    MpDumpFireApi(player);
+}
+
+/**
+ * Once per session: what the game offers for making a remote player's weapon visibly fire.
+ *
+ * Remote fire events arrive and are ignored - neither player sees the other shoot. The
+ * candidates (AIWeapon's static fire functions, FireFXEvent, WeaponObject's fire/shoot/muzzle
+ * functions) cannot be read offline with their parameters, so they are written down here.
+ */
+@addField(PlayerPuppet)
+public let m_mpFireApiDumped: Bool;
+
+public func MpDumpFireApi(player: ref<PlayerPuppet>) -> Void {
+    if !IsDefined(player) || player.m_mpFireApiDumped {
+        return;
+    }
+    player.m_mpFireApiDumped = true;
+
+    MpDumpFunctions(n"AIWeapon", "", true);
+    MpDumpFunctions(n"WeaponObject", "Fire|Shoot|Muzzle|Effect|Burst|Trigger", false);
+    MpDumpFunctions(n"gameweaponObject", "Fire|Shoot|Muzzle|Effect|Burst|Trigger", false);
+
+    let props = Reflection.GetClass(n"FireFXEvent").GetProperties();
+    let text = "";
+    let i = 0;
+    while i < ArraySize(props) {
+        text += s"\(NameToString(props[i].GetName())): \(NameToString(props[i].GetType().GetName())); ";
+        i += 1;
+    }
+    MpFTLog(s"[FireApi] FireFXEvent { \(text)}");
+}
+
+public func MpDumpFunctions(className: CName, filter: String, statics: Bool) -> Void {
+    let cls = Reflection.GetClass(className);
+    if !IsDefined(cls) {
+        MpFTLog(s"[FireApi] no class \(NameToString(className))");
+        return;
+    }
+
+    let fns: array<ref<ReflectionFunc>>;
+    let k = 0;
+    if statics {
+        let staticFns = cls.GetStaticFunctions();
+        while k < ArraySize(staticFns) {
+            ArrayPush(fns, staticFns[k]);
+            k += 1;
+        }
+    } else {
+        let memberFns = cls.GetFunctions();
+        while k < ArraySize(memberFns) {
+            ArrayPush(fns, memberFns[k]);
+            k += 1;
+        }
+    }
+
+    let i = 0;
+    while i < ArraySize(fns) {
+        let name = NameToString(fns[i].GetName());
+        if Equals(filter, "") || MpMatchesAny(name, filter) {
+            let params = fns[i].GetParameters();
+            let text = "";
+            let j = 0;
+            while j < ArraySize(params) {
+                text += s"\(NameToString(params[j].GetName())): \(NameToString(params[j].GetType().GetName())), ";
+                j += 1;
+            }
+            MpFTLog(s"[FireApi] \(NameToString(className)).\(name)(\(text))");
+        }
+        i += 1;
+    }
+}
+
+// True when the name contains any of the |-separated words.
+public func MpMatchesAny(name: String, words: String) -> Bool {
+    let rest = words;
+    while StrLen(rest) > 0 {
+        let cut = StrFindFirst(rest, "|");
+        let word = cut >= 0 ? StrLeft(rest, cut) : rest;
+        if StrLen(word) > 0 && StrContains(name, word) {
+            return true;
+        }
+        rest = cut >= 0 ? StrMid(rest, cut + 1) : "";
+    }
+    return false;
 }
 
 public func MpPollIsCurrent(owner: wref<PlayerPuppet>, token: Int32) -> Bool {

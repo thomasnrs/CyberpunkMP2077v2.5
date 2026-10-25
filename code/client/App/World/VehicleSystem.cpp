@@ -596,7 +596,19 @@ bool VehicleSystem::HandleVehicleExitMessage(const PacketEvent<server::NotifyVeh
     spdlog::info("[VehicleSystem] HandleVehicleExitMessage: character {:x}", aMessage.get_character_id());
 
     const auto worldSystem = Red::GetGameSystem<NetworkWorldSystem>();
-    const auto character = worldSystem->GetEntityIdByServerId(aMessage.get_character_id());
+    auto character = worldSystem->GetEntityIdByServerId(aMessage.get_character_id());
+
+    // About US: the server pulled us out (somebody took the driver's seat). Exits are
+    // broadcast to everyone but the person leaving, so this only arrives when the server
+    // decided it - and our own V is no remote puppet, so resolve the local player instead.
+    const auto self = worldSystem->GetRemotePlayerId();
+    if (self && *self == aMessage.get_character_id())
+    {
+        Red::Handle<Red::GameObject> player;
+        Red::GetGameSystem<Game::PlayerSystem>()->GetLocalPlayerControlledGameObject(player);
+        character = player ? player->id : Red::EntityID{};
+        spdlog::info("[VehicleSystem] HandleVehicleExitMessage: the server pulled US out of the vehicle");
+    }
 
     if (character.hash != 0)
     {

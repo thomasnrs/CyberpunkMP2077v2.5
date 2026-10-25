@@ -2389,16 +2389,44 @@ void Level::HandleEnterVehicleRequest(PacketEvent<client::EnterVehicleRequest>& 
     }
 
     bool seatTaken = false;
+    flecs::entity occupant;
 
     GetWorld()->each(
-        [vehicle, requestedSeat, target, &seatTaken](flecs::entity aOccupant, const AttachmentComponent& aAttachment)
+        [vehicle, requestedSeat, target, &seatTaken, &occupant](flecs::entity aOccupant, const AttachmentComponent& aAttachment)
         {
             if (aOccupant == target)
                 return;
 
             if (aAttachment.Parent == vehicle && aAttachment.SlotId == requestedSeat)
+            {
                 seatTaken = true;
+                occupant = aOccupant;
+            }
         });
+
+    // Taking the driver's seat from another player: the game's own "take control" at the
+    // driver's door, which already seats the taker locally. The occupant is pulled out -
+    // everyone else is told by the attachment's remove observer, and their own client,
+    // which that broadcast skips, is told directly so their V actually leaves the car.
+    // Without this the taker sat in a seat the server refused while the driver kept
+    // driving on every other screen.
+    const auto* pOccupantOwner = occupant && occupant.parent() ? occupant.parent().get<PlayerComponent>() : nullptr;
+    if (seatTaken && requestedSeat == 0xb000b1d029d0cea0ULL /* seat_front_left */ && pOccupantOwner)
+    {
+        spdlog::info("Player {:x} pulled {:x} out of {} in vehicle {:x}", aMessage.get_id(), occupant.id(),
+                     VehicleSeatName(requestedSeat), vehicle.id());
+
+        occupant.remove<AttachmentComponent>();
+
+        server::NotifyVehicleExit eject;
+        eject.set_character_id(occupant);
+        GServer->Send(pOccupantOwner->Connection, eject);
+
+        if (auto* pChat = GetWorld()->get_mut<ChatSystem>())
+            pChat->Tell(*pOccupantOwner, fmt::format("{} pulled you out of the car.", pPlayer->Username));
+
+        seatTaken = false;
+    }
 
     if (seatTaken)
     {
