@@ -248,6 +248,15 @@ public class MpDeathGuard extends ScriptStatPoolsListener {
             return false;
         }
 
+        // The server has us down already: that death is its to end (a medic or the bleedout).
+        // Reviving here put Hoka back on his feet and teleported him while every other screen
+        // still showed him down. Keep the floor armed and stay put.
+        if system.IsDowned() {
+            MpFTLog(s"[Death] health floor reached while the server has us down - staying down");
+            MpArmDeathFloor(this.player);
+            return true;
+        }
+
         MpFTLog(s"[Death] downed - reviving instead of flatlining");
 
         MpShowFlatlinedMessage();

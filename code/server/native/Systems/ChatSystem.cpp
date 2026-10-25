@@ -2094,11 +2094,41 @@ void ChatSystem::HandleRespawnRequest(const PacketEvent<client::RespawnRequest>&
 
     auto* pPlayer = entity.get_mut<PlayerComponent>();
 
+    // Down is the server's to end: a medic, or the bleedout. This request comes from the
+    // client's own no-flatline guard, which an NPC's bullet can trip while the server has
+    // them down - teleporting them away from the medic walking over is the wrong answer.
+    auto* pHealth = pPlayer->Puppet ? pPlayer->Puppet.get_mut<HealthComponent>() : nullptr;
+    if (pHealth && (pHealth->LifeState == LifeState::kDowned || pHealth->LifeState == LifeState::kReviving))
+    {
+        spdlog::info("{} asked to respawn while down - refused, they wait for a medic or the bleedout",
+                     pPlayer->Username);
+        return;
+    }
+
+    // Bled out: the client asks for this by itself (Combat.reds). Same as /respawn - back up
+    // at the revived health, state broadcast after the teleport below.
+    const bool fromDead = pHealth && pHealth->LifeState == LifeState::kDead;
+    if (fromDead)
+    {
+        pHealth->Health = kRevivedHealth;
+        pHealth->LifeState = LifeState::kAlive;
+        pHealth->DownedAt = 0;
+        pHealth->Stabilized = false;
+        pHealth->TreatedBy.clear();
+        pHealth->TreatmentEndsAt = 0;
+    }
+
     glm::vec3 position;
     float yaw = 0.f;
 
     if (!GServer->GetRespawnPoint(position, yaw))
     {
+        if (fromDead)
+        {
+            if (auto* pLevel = m_pWorld->get_mut<Level>())
+                pLevel->BroadcastCombatState(pPlayer->Puppet);
+        }
+
         // No respawn point set yet. Reviving where they fell is a worse outcome than the
         // Afterlife but a far better one than lying dead waiting for a load screen, so
         // the client has already healed them and this simply leaves them put.
@@ -2130,7 +2160,15 @@ void ChatSystem::HandleRespawnRequest(const PacketEvent<client::RespawnRequest>&
 
     GServer->Send(pPlayer->Connection, teleport);
 
-    spdlog::info("Respawned {} at ({:.1f}, {:.1f}, {:.1f})", pPlayer->Username, position.x, position.y, position.z);
+    // State after the move, as /respawn does, so they are never upright where they died.
+    if (fromDead)
+    {
+        if (auto* pLevel = m_pWorld->get_mut<Level>())
+            pLevel->BroadcastCombatState(pPlayer->Puppet);
+    }
+
+    spdlog::info("Respawned {} at ({:.1f}, {:.1f}, {:.1f}){}", pPlayer->Username, position.x, position.y, position.z,
+                 fromDead ? " from dead" : "");
 }
 
 void ChatSystem::Broadcast(String acUsername, String acMessage, uint32_t aChannel)
@@ -4502,14 +4540,9 @@ bool ChatSystem::HandleModerationCommand(flecs::entity aSender, const PlayerComp
 
         if (command == "/revive")
         {
-            // Stabilise first. It is the procedure that stops them dying, and allowing a
-            // revive straight from critical would make stabilisation pointless - which
-            // would in turn make the bleedout timer the only thing that ever mattered.
-            if (!pHealth->Stabilized)
-            {
-                Tell(acSender, "They are not stable enough. /stabilize first.");
-                return true;
-            }
+            // No stabilise-first gate. It was the RP server's procedure; between two friends
+            // it was a second command nobody knew about, and every first /revive was
+            // refused. /stabilize still stops the bleedout clock for a longer wait.
 
             pHealth->LifeState = LifeState::kReviving;
             pHealth->TreatedBy = medicId;

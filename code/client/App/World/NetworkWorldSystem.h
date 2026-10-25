@@ -427,6 +427,9 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     // Whether the server has us down. Script reads it to stop treating us as upright.
     bool IsDowned() const { return m_downed; }
 
+    // Our own life state as the server last gave it: 0 alive, 1 downed, 2 dead, 3 reviving.
+    uint32_t GetOwnLifeState() const { return m_ownLifeState; }
+
     // Life-state changes of OTHER combatants, for drawing them down or back up. Returns the
     // server id of the next one waiting (0 when none) and leaves its new state for
     // GetConsumedLifeState. See MpApplyRemoteLifeStates in Combat.reds.
@@ -869,6 +872,7 @@ private:
     // nothing new since script last looked.
     float m_incomingHealth{-1.f};
     bool m_downed{false};
+    uint32_t m_ownLifeState{0};
     void NoteRemoteLifeState(uint64_t aServerId, uint32_t aState);
     std::unordered_map<uint64_t, uint32_t> m_remoteLifeStates;
     Vector<std::pair<uint64_t, uint32_t>> m_remoteLifeChanges;
@@ -1047,6 +1051,7 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(ConsumeIncomingStatusEffect);
     RTTI_METHOD(ConsumeIncomingHealth);
     RTTI_METHOD(IsDowned);
+    RTTI_METHOD(GetOwnLifeState);
     RTTI_METHOD(ConsumeRemoteLifeChange);
     RTTI_METHOD(GetConsumedLifeState);
     RTTI_METHOD(GetRemoteLifeState);

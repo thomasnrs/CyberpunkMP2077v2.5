@@ -879,6 +879,15 @@ public func MpApplyDownedState(player: ref<PlayerPuppet>, network: ref<NetworkWo
 
     let downed = network.IsDowned();
 
+    // Bled out: back to the respawn point by ourselves, once. The server only accepts this
+    // from dead (ChatSystem::HandleRespawnRequest) and broadcasts us standing.
+    if downed && Equals(network.GetOwnLifeState(), 2u) && !player.m_mpRespawnAsked {
+        player.m_mpRespawnAsked = true;
+        MpShowDownedMessage("YOU BLED OUT - BACK AT THE SPAWN POINT", 5.0);
+        network.RequestRespawn();
+        network.ScriptLog("combat: bled out - asked the server to respawn us");
+    }
+
     // Edge-triggered. Nothing to do on the ticks where the answer has not changed.
     if Equals(downed, player.m_mpWasDowned) {
         return;
@@ -887,8 +896,13 @@ public func MpApplyDownedState(player: ref<PlayerPuppet>, network: ref<NetworkWo
     player.m_mpWasDowned = downed;
 
     if downed {
+        // Defeated alone does nothing visible to the player's own V on 2.5 - Hoka was downed
+        // by the server and walked and shot on as if nothing had happened, while everyone
+        // else saw him lying where he fell. The gameplay restrictions are what pin him there.
         StatusEffectHelper.ApplyStatusEffect(player, t"BaseStatusEffect.Defeated");
-        network.ScriptLog("combat: the server put us down - Defeated applied, waiting on a medic");
+        MpSetDownedRestrictions(player, true);
+        MpShowDownedMessage("YOU ARE DOWN - a friend can /revive you", 8.0);
+        network.ScriptLog("combat: the server put us down - Defeated and restrictions applied, waiting on a medic");
         return;
     }
 
@@ -896,6 +910,55 @@ public func MpApplyDownedState(player: ref<PlayerPuppet>, network: ref<NetworkWo
     // doing it here as well covers a revive the server decided on its own, and removing an
     // effect that is not applied is harmless.
     StatusEffectHelper.RemoveStatusEffect(player, t"BaseStatusEffect.Defeated");
+    MpSetDownedRestrictions(player, false);
+    player.m_mpRespawnAsked = false;
     network.ScriptLog("combat: the server stood us back up");
+}
+
+@addField(PlayerPuppet)
+public let m_mpRespawnAsked: Bool;
+
+/**
+ * What keeps a downed player down: no walking, no fighting, no vehicles. Each record is
+ * applied only if this patch has it, and the log says which, so a renamed restriction shows
+ * up as a missing line rather than as a player who can still run.
+ */
+public func MpSetDownedRestrictions(player: ref<PlayerPuppet>, on: Bool) -> Void {
+    let restrictions: array<TweakDBID> = [
+        t"GameplayRestriction.NoMovement",
+        t"GameplayRestriction.NoCombat",
+        t"GameplayRestriction.NoJump",
+        t"GameplayRestriction.NoSprint",
+        t"GameplayRestriction.NoDriving",
+        t"GameplayRestriction.VehicleBlock"
+    ];
+
+    let applied = "";
+    let i = 0;
+    while i < ArraySize(restrictions) {
+        let id = restrictions[i];
+        if IsDefined(TweakDBInterface.GetStatusEffectRecord(id)) {
+            if on {
+                StatusEffectHelper.ApplyStatusEffect(player, id);
+            } else {
+                StatusEffectHelper.RemoveStatusEffect(player, id);
+            }
+            applied += s"\(TDBID.ToNumber(id)) ";
+        }
+        i += 1;
+    }
+
+    MpFTLog(s"[Combat] downed restrictions \(on ? "on" : "off"): \(applied)");
+}
+
+public func MpShowDownedMessage(text: String, seconds: Float) -> Void {
+    let message: SimpleScreenMessage;
+    message.isShown = true;
+    message.duration = seconds;
+    message.message = text;
+
+    GameInstance.GetBlackboardSystem(GetGameInstance())
+        .Get(GetAllBlackboardDefs().UI_Notifications)
+        .SetVariant(GetAllBlackboardDefs().UI_Notifications.WarningMessage, ToVariant(message), true);
 }
 

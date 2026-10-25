@@ -308,6 +308,8 @@ public native class NetworkWorldSystem extends IGameSystem {
     // a delta - see MpApplyServerHealth.
     public native func ConsumeIncomingHealth() -> Float;
     public native func IsDowned() -> Bool;
+    // 0 alive, 1 downed, 2 dead, 3 reviving - as the server last said.
+    public native func GetOwnLifeState() -> Uint32;
 
     // Other combatants going down or getting up - see MpApplyRemoteLifeStates.
     public native func ConsumeRemoteLifeChange() -> Uint64;

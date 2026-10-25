@@ -2359,7 +2359,10 @@ void NetworkWorldSystem::HandleDamageResult(const PacketEvent<server::NotifyDama
     m_incomingHealth = aMessage.get_target_health_after();
 
     if (aMessage.get_knocked_down())
+    {
         m_downed = true;
+        m_ownLifeState = 1;
+    }
 
     spdlog::info("[Combat] we took {:.1f} damage from entity {} - health now {:.1f}{}",
                  aMessage.get_final_damage(), aMessage.get_attacker_id(), aMessage.get_target_health_after(),
@@ -2381,6 +2384,7 @@ void NetworkWorldSystem::HandleCombatState(const PacketEvent<server::NotifyComba
 
     m_incomingHealth = aMessage.get_health();
     m_downed = aMessage.get_life_state() != 0;
+    m_ownLifeState = aMessage.get_life_state();
 
     spdlog::info("[Combat] server set our health to {:.1f} (state {})", aMessage.get_health(),
                  aMessage.get_life_state());
