@@ -121,7 +121,17 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
         return;
     }
 
-    MpFTLog(s"[Combat] reporting \(damage) damage on remote \(targetId)");
+    // As a share of the body that took it. The server's pool is 0..100, and the raw figure is
+    // in the hit body's own hit points - a punch on a hitbox came to 172 and downed a player
+    // outright. A tenth of the hitbox's health is a tenth of the player's.
+    let maxHealth = GameInstance.GetStatPoolsSystem(target.GetGame())
+        .GetStatPoolMaxPointValue(Cast<StatsObjectID>(target.GetEntityID()), gamedataStatPoolType.Health);
+    let raw = damage;
+    if maxHealth > 0.0 {
+        damage = raw * 100.0 / maxHealth;
+    }
+
+    MpFTLog(s"[Combat] reporting \(damage)% (\(raw) of \(maxHealth)) on remote \(targetId)");
 
     // HIT ZONE, read from the game rather than invented.
     //
@@ -483,6 +493,7 @@ public class MpStatusEffectPoll extends DelayCallback {
                 MpApplyDownedState(player, network);
                 MpApplyRemoteLifeStates(network);
                 MpApplyRemoteWeapons(network);
+                MpRehideHitboxes(player as PlayerPuppet);
                 MpApplyIncomingUploads(network);
             }
         }

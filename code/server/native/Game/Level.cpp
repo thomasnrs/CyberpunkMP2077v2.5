@@ -1798,6 +1798,39 @@ void Level::BroadcastCombatState(flecs::entity aPuppet) noexcept
     // exactly who most needs telling. Their own client only ever proposed a number.
     GetWorld()->get_world().each([&message](flecs::entity, const PlayerComponent& aPlayerComponent)
                                  { GServer->Send(aPlayerComponent.Connection, message); });
+
+    // Back up from down. Other clients draw a downed puppet with the game's Defeated, which
+    // an NPC never gets up from - removing the effect left it lying there for good. A fresh
+    // puppet is standing, dressed and driven again.
+    const bool gotUp = pHealth->LifeState == 0 && pHealth->LastBroadcastLifeState != 0;
+    if (auto* pMutable = aPuppet.get_mut<HealthComponent>())
+        pMutable->LastBroadcastLifeState = pMutable->LifeState;
+
+    if (gotUp)
+        RespawnForOthers(aPuppet);
+}
+
+void Level::RespawnForOthers(flecs::entity aPuppet) noexcept
+{
+    if (!aPuppet || !aPuppet.is_alive() || !aPuppet.get<MovementComponent>())
+        return;
+
+    server::NotifyEntityUnload unload;
+    unload.set_id(aPuppet);
+    const auto load = Serialize(aPuppet);
+    const auto owner = aPuppet.parent();
+
+    GetWorld()->each(
+        [&unload, &load, owner](flecs::entity aPlayer, const PlayerComponent& aPlayerComponent, const LevelSystemTag&)
+        {
+            if (!IsDebug() && owner == aPlayer)
+                return;
+
+            GServer->Send(aPlayerComponent.Connection, unload);
+            GServer->Send(aPlayerComponent.Connection, load);
+        });
+
+    spdlog::info("[Combat] {:x} got up - re-sent to everyone else as a fresh puppet", aPuppet.id());
 }
 
 void Level::HandleCombatEventRequest(PacketEvent<client::CombatEventRequest>& aMessage) noexcept

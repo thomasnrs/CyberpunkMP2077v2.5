@@ -32,6 +32,10 @@ struct HealthComponent
     // somewhere to put "should be down but is not gone".
     uint32_t LifeState{0};
 
+    // The life state last broadcast, so BroadcastCombatState can tell a getting-up from any
+    // other update - see Level::RespawnForOthers.
+    uint32_t LastBroadcastLifeState{0};
+
     // The last combat sequence accepted from this entity's owner.
     //
     // Duplicate and replayed events are rejected by comparing against this rather than by

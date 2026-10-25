@@ -129,7 +129,9 @@ protected cb func OnHighLevelStateDataEvent(evt: ref<gameHighLevelStateDataEvent
 
     let puppet = this.GetOwner() as ScriptedPuppet;
 
-    if IsDefined(puppet) && puppet.HasTag(n"CyberpunkMP.Puppet")
+    // Not while the server has them down: Defeated moves the AI on by design, and pulling it
+    // back to Relaxed fought the very state being drawn.
+    if IsDefined(puppet) && puppet.HasTag(n"CyberpunkMP.Puppet") && !puppet.m_mpServerDowned
         && NotEquals(evt.currentHighLevelState, gamedataNPCHighLevelState.Relaxed) {
         puppet.m_mpRelaxCount += 1;
 
@@ -192,19 +194,58 @@ public func MpSetupHitbox(entity: ref<GameObject>) -> Void {
         return;
     }
 
-    // Every mesh off, so nothing draws; the hit representation is not a mesh and stays.
+    let hidden = MpHideHitbox(entity);
+
+    // Kept, so the poll can hide it again: a hard hit threw the first one into ragdoll and
+    // it came back visible, upside down in the air.
+    let player = GetPlayer(GetGameInstance());
+    if IsDefined(player) && !ArrayContains(player.m_mpHitboxes, entity) {
+        ArrayPush(player.m_mpHitboxes, entity);
+    }
+
+    MpFTLog(s"[Hitbox] \(EntityID.GetHash(entity.GetEntityID())) set up - \(hidden) mesh component(s) hidden");
+}
+
+/**
+ * Every mesh off, so nothing draws, and the ragdoll off, so a hard hit cannot fling the body
+ * away from the puppet it stands in for. The hit representation is neither and stays.
+ */
+public func MpHideHitbox(entity: ref<GameObject>) -> Int32 {
     let components = entity.GetComponents();
     let hidden = 0;
     let i = 0;
     while i < ArraySize(components) {
-        if IsDefined(components[i]) && StrContains(NameToString(components[i].GetClassName()), "Mesh") {
-            components[i].Toggle(false);
-            hidden += 1;
+        if IsDefined(components[i]) {
+            let name = NameToString(components[i].GetClassName());
+            if StrContains(name, "Mesh") || Equals(name, "entRagdollComponent") {
+                if components[i].IsEnabled() {
+                    components[i].Toggle(false);
+                }
+                hidden += 1;
+            }
         }
         i += 1;
     }
+    return hidden;
+}
 
-    MpFTLog(s"[Hitbox] \(EntityID.GetHash(entity.GetEntityID())) set up - \(hidden) mesh component(s) hidden");
+@addField(PlayerPuppet)
+public let m_mpHitboxes: array<wref<GameObject>>;
+
+// Called from the combat poll: anything that switched a hitbox's meshes back on is undone
+// within a quarter of a second, and hitboxes that have gone are forgotten.
+public func MpRehideHitboxes(player: ref<PlayerPuppet>) -> Void {
+    let kept: array<wref<GameObject>>;
+    let i = 0;
+    while i < ArraySize(player.m_mpHitboxes) {
+        let hitbox = player.m_mpHitboxes[i];
+        if IsDefined(hitbox) {
+            MpHideHitbox(hitbox);
+            ArrayPush(kept, hitbox);
+        }
+        i += 1;
+    }
+    player.m_mpHitboxes = kept;
 }
 
 public static func MpGodModeRecheckSeconds() -> Float = 1.0

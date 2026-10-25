@@ -113,6 +113,10 @@ public:
     // Quiet state, not an event - see NotifyCombatState.
     void BroadcastCombatState(flecs::entity aPuppet) noexcept;
 
+    // Unload and load this puppet again on every client but its owner's - a puppet the game
+    // drew as Defeated cannot be stood back up in place.
+    void RespawnForOthers(flecs::entity aPuppet) noexcept;
+
 private:
 
 public:
