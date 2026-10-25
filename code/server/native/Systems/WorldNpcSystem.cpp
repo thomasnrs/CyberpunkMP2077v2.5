@@ -30,16 +30,42 @@ constexpr size_t kMaxMirrors = 256;
 WorldNpcSystem::WorldNpcSystem(gsl::not_null<World*> apWorld)
     : m_pWorld(apWorld)
 {
-    std::error_code ec;
-    m_echo = std::filesystem::exists(GetPath() / "config" / "npcmirror.echo", ec);
-    if (m_echo)
-        spdlog::warn("[WorldNpc] config/npcmirror.echo found - mirrors are sent to the host too (solo testing)");
-
     GServer->RegisterHandler<&WorldNpcSystem::HandleWorldNpcReport>(this);
+}
+
+// Off unless config/worldnpc.on exists - checked every few seconds, so it can be switched
+// without a restart. Off until guests hide their own NPCs: until then a guest sees their
+// city's NPCs AND the host's mirrors. npcmirror.echo the same way.
+void WorldNpcSystem::ReadSwitches() noexcept
+{
+    std::error_code ec;
+    const bool enabled = std::filesystem::exists(GetPath() / "config" / "worldnpc.on", ec);
+    const bool echo = std::filesystem::exists(GetPath() / "config" / "npcmirror.echo", ec);
+
+    if (enabled != m_enabled)
+        spdlog::warn("[WorldNpc] world NPC sync {}", enabled ? "ON (config/worldnpc.on)" : "OFF");
+    if (echo != m_echo)
+        spdlog::warn("[WorldNpc] echo to the host {}", echo ? "ON (config/npcmirror.echo)" : "OFF");
+
+    // Either change invalidates every mirror: parented or not, wanted or not.
+    if (enabled != m_enabled || echo != m_echo)
+        ClearMirrors();
+
+    m_enabled = enabled;
+    m_echo = echo;
 }
 
 void WorldNpcSystem::Update(std::chrono::steady_clock::time_point aNow) noexcept
 {
+    if (aNow - m_lastSwitchRead >= std::chrono::seconds(3))
+    {
+        m_lastSwitchRead = aNow;
+        const bool wasEnabled = m_enabled;
+        ReadSwitches();
+        if (wasEnabled != m_enabled)
+            m_lastHostBroadcast = {};
+    }
+
     ChooseHost();
 
     if (aNow - m_lastHostBroadcast >= kHostBroadcastInterval)
@@ -95,12 +121,13 @@ void WorldNpcSystem::ChooseHost() noexcept
 
 void WorldNpcSystem::BroadcastHost() noexcept
 {
-    const auto host = m_host;
+    // Switched off, nobody is host - so nobody spends the bandwidth reporting.
+    const auto host = m_enabled ? m_host : flecs::entity{};
     m_pWorld->each(
         [host](flecs::entity aPlayer, const PlayerComponent& aPlayerComponent)
         {
             server::NotifyWorldHost message;
-            message.set_is_host(aPlayer == host);
+            message.set_is_host(host && aPlayer == host);
             GServer->Send(aPlayerComponent.Connection, message);
         });
 }
@@ -121,8 +148,8 @@ void WorldNpcSystem::HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& a
     auto* pPlayerManager = m_pWorld->get_mut<PlayerManager>();
     const auto sender = pPlayerManager->GetByConnectionId(aMessage.ConnectionId);
 
-    // Only the host speaks for the city.
-    if (!sender || sender != m_host)
+    // Only the host speaks for the city, and only while the sync is switched on.
+    if (!m_enabled || !sender || sender != m_host)
         return;
 
     auto* pLevel = m_pWorld->get_mut<Level>();

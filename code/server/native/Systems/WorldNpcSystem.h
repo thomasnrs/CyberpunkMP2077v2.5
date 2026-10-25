@@ -16,6 +16,7 @@ struct World;
 // The host is the first player in the world; when they leave, the next one takes over and
 // the old mirrors are removed for the new host to report afresh.
 //
+// Off unless config/worldnpc.on exists (re-read every few seconds, no restart needed).
 // config/npcmirror.echo sends the mirrors to the host as well, so one person can see the
 // copies standing beside the originals.
 struct WorldNpcSystem
@@ -30,6 +31,7 @@ protected:
     void HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& aMessage) noexcept;
 
 private:
+    void ReadSwitches() noexcept;
     void ChooseHost() noexcept;
     void BroadcastHost() noexcept;
     void ClearMirrors() noexcept;
@@ -45,5 +47,7 @@ private:
     flecs::entity m_host;
     std::unordered_map<uint64_t, Mirror> m_mirrors; // host local id -> mirror
     std::chrono::steady_clock::time_point m_lastHostBroadcast{};
+    std::chrono::steady_clock::time_point m_lastSwitchRead{};
+    bool m_enabled{false};
     bool m_echo{false};
 };
