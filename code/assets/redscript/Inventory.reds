@@ -751,6 +751,19 @@ public class MpInventory {
 
     network.ScriptLog(s"restore DONE: \(restored) stack(s) given, \(removed) taken back, stacks \(stacksBefore) -> \(stacksAfter), money \(held) -> \(moneyAfter) (expected \(expectedMoney), server said \(stored))");
 
+    // Weight, again. The template loads with ~640 stacks and the game declares the player
+    // overweight on the spot; taking ~560 back and restoring Body (carry capacity) never made
+    // it look again, so "overweight" stayed on screen with a light pack. Now, and twice more
+    // for the unequips that land late.
+    player.MpReevaluateEncumbrance();
+    let delays = GameInstance.GetDelaySystem(player.GetGame());
+    let soon = new MpEncumbranceCallback();
+    soon.player = player;
+    delays.DelayCallback(soon, 1.0, false);
+    let later = new MpEncumbranceCallback();
+    later.player = player;
+    delays.DelayCallback(later, 3.0, false);
+
     if moneyAfter != expectedMoney {
       network.ScriptLog(s"restore MISMATCH: money should be \(expectedMoney) and is \(moneyAfter) - the adjustment did NOT land. The world was probably not ready to accept it; compare with [MONEY] 4 above.");
     }
@@ -1275,4 +1288,20 @@ public func MpSettleStarterLoadout(network: ref<NetworkWorldSystem>, player: ref
   }
 
   network.ScriptLog(s"settlement: removed \(removed) engine-granted stack(s) and \(pulled) cyberware piece(s) - this character is now INITIALIZED and will never be cleaned again");
+}
+
+// EvaluateEncumbrance is private to PlayerPuppet; an added method may call it.
+@addMethod(PlayerPuppet)
+public func MpReevaluateEncumbrance() -> Void {
+    this.EvaluateEncumbrance();
+}
+
+public class MpEncumbranceCallback extends DelayCallback {
+    public let player: wref<PlayerPuppet>;
+
+    public func Call() -> Void {
+        if IsDefined(this.player) {
+            this.player.MpReevaluateEncumbrance();
+        }
+    }
 }
