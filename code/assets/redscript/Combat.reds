@@ -402,10 +402,11 @@ public func MpRemoteFire(puppet: ref<ScriptedPuppet>) -> Void {
  * The motion and flash of a remote shot.
  *
  * Found by trying candidates on the lab walker with someone watching: single animation
- * events (Shoot, shoot, fire, EnterHipFire) and the weapon's trigger moved nothing. What
- * moves the body is the animation graph told it is in combat (AnimFeature_CombatState) plus
- * the AI's own force-shoot command for a moment - the Relaxed lock in Hackable.reds pulls the
- * AI back straight after. The flash is the weapon's own trigger effect, and muzzle_flash.
+ * events on their own and the weapon's trigger moved nothing. The animation graph told it
+ * is in combat (AnimFeature_CombatState) plus the Shoot event fires straight ahead from the
+ * raised weapon - the one that looked right. The AI's force-shoot command also moved the
+ * body, but it fires wherever the AI is facing and wakes the AI, so it is not used. The
+ * flash is the weapon's own trigger effect (None on 2.5's pistols), and muzzle_flash.
  */
 @addField(ScriptedPuppet)
 public let m_mpTriggerEffectLogged: Bool;
@@ -415,10 +416,7 @@ public func MpTryRecoil(puppet: ref<ScriptedPuppet>, weapon: ref<WeaponObject>) 
     combat.isInCombat = true;
     AnimationControllerComponent.ApplyFeatureToReplicate(puppet, n"CombatState", combat);
 
-    let shoot = new AIForceShootCommand();
-    shoot.duration = 0.3;
-    shoot.immediately = true;
-    puppet.GetAIControllerComponent().SendCommand(shoot);
+    AnimationControllerComponent.PushEvent(puppet, n"Shoot");
 
     let trigger = weapon.GetTriggerEffectName();
     if NotEquals(trigger, n"") && NotEquals(trigger, n"None") {
