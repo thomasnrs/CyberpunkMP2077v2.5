@@ -406,13 +406,23 @@ bool VehicleSystem::HandleVehicleLoadMessage(const PacketEvent<server::NotifyVeh
     const auto quat = glm::quat(eulerAngles);
     Red::Quaternion rotation = Game::ToRed(quat);
 
+    // Both of these returned silently, and a remote car that never appears looked exactly like
+    // one that appeared and was never reported ready - no session on 2.5 has logged
+    // OnVehicleReady once.
     if (!Red::Detail::CallFunctionWithArgs(nullptr, m_pSpawnVehicle, handle, id, aMessage.get_tweak_id(), position, rotation))
+    {
+        spdlog::warn("[VehicleDup] SpawnVehicle call failed for server vehicle {}", aMessage.get_id());
         return false;
+    }
 
     if (!id.IsDynamic())
+    {
+        spdlog::warn("[VehicleDup] SpawnVehicle gave server vehicle {} no dynamic entity (id {:x}) - record not spawnable?",
+                     aMessage.get_id(), id.hash);
         return false;
+    }
 
-    // spdlog::info("[VehicleSystem] * Spawned: {}, {}", aMessage.get_id(), id.hash);
+    spdlog::info("[VehicleDup] server vehicle {} is entity {:x} - waiting for it to attach", aMessage.get_id(), id.hash);
 
     // Record the engine-entity -> server-id mapping on the main thread, so the hit hook
     // can resolve a shot car from a job thread without running a flecs query there. See

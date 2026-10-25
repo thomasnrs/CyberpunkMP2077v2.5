@@ -34,12 +34,34 @@ public native class VehicleSystem extends IScriptable {
         vehicle_spec.tags = [n"CyberpunkMP.Vehicle"];
         let vehicle_entity_id = entity_system.CreateEntity(vehicle_spec);
 
+        MpFTLog(s"[VehicleSystem] SpawnVehicle record \(TDBID.ToNumber(type)) valid \(TDBID.IsValid(type)) -> entity \(EntityID.GetHash(vehicle_entity_id))");
+
+        // Not only the Entity/Attached callback below: it has never fired for a remote car on
+        // 2.5, so nothing was ever mounted into one. The poll finds the entity itself.
+        if EntityID.IsDefined(vehicle_entity_id) {
+            let poll = new MpVehicleReadyPoll();
+            poll.system = this;
+            poll.entityId = vehicle_entity_id;
+            GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(poll, 0.25, false);
+        }
+
         return vehicle_entity_id;
     }
 
     private cb func OnEntityAttached(event: ref<EntityLifecycleEvent>) {
-        LogChannel(n"DEBUG", "[VehicleSystem] OnEntityAttached");
-        this.OnVehicleReady(event.GetEntity().GetEntityID());
+        MpFTLog(s"[VehicleSystem] Entity/Attached for \(EntityID.GetHash(event.GetEntity().GetEntityID()))");
+        this.ReportReady(event.GetEntity() as GameObject);
+    }
+
+    // Once per vehicle, whichever of the callback and the poll sees it first.
+    public func ReportReady(entity: ref<GameObject>) -> Void {
+        let vehicle = entity as VehicleObject;
+        if !IsDefined(vehicle) || vehicle.m_mpReadyReported {
+            return;
+        }
+
+        vehicle.m_mpReadyReported = true;
+        this.OnVehicleReady(vehicle.GetEntityID());
     }
 
     public func EnterVehicle(character_id: EntityID, vehicle_id: EntityID, sit_position: CName) -> Bool {
@@ -183,4 +205,47 @@ protected cb func OnUnmountingEvent(evt: ref<UnmountingEvent>) -> Bool {
     GameInstance.GetNetworkWorldSystem().GetVehicleSystem().OnVehicleExit();
 
     return result;
+}
+
+/**
+ * Finds a remote car this client spawned and reports it ready once it is in the world.
+ *
+ * The Entity/Attached callback VehicleSystem registers has never fired for one on 2.5: every
+ * session logged "queueing mount for vehicle ..." and nothing after it, so no remote car was
+ * ever made remote-driven or had its driver seated. Ten seconds, four checks a second.
+ */
+@addField(VehicleObject)
+public let m_mpReadyReported: Bool;
+
+public class MpVehicleReadyPoll extends DelayCallback {
+    public let system: wref<VehicleSystem>;
+    public let entityId: EntityID;
+    public let attempts: Int32;
+
+    public func Call() -> Void {
+        if !IsDefined(this.system) {
+            return;
+        }
+
+        let vehicle = GameInstance.FindEntityByID(GetGameInstance(), this.entityId) as VehicleObject;
+        if IsDefined(vehicle) && vehicle.IsAttached() {
+            if !vehicle.m_mpReadyReported {
+                MpFTLog(s"[VehicleSystem] found remote vehicle \(EntityID.GetHash(this.entityId)) after \(this.attempts) check(s)");
+            }
+            this.system.ReportReady(vehicle);
+            return;
+        }
+
+        this.attempts += 1;
+        if this.attempts >= 40 {
+            MpFTLog(s"[VehicleSystem] remote vehicle \(EntityID.GetHash(this.entityId)) never appeared (defined: \(IsDefined(vehicle)))");
+            return;
+        }
+
+        let again = new MpVehicleReadyPoll();
+        again.system = this.system;
+        again.entityId = this.entityId;
+        again.attempts = this.attempts;
+        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.25, false);
+    }
 }
