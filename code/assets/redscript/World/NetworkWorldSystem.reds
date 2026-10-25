@@ -870,6 +870,9 @@ public native class NetworkWorldSystem extends IGameSystem {
     }
 
     public func DeletePuppet(entityId: EntityID) {
+        // Nothing of ours left running on it: an AI shoot command in flight on a deleted
+        // puppet crashed the game inside the engine.
+        MpCancelShootCommand(GameInstance.FindEntityByID(GetGameInstance(), entityId) as ScriptedPuppet);
         GameInstance.GetDynamicEntitySystem().DeleteEntity(entityId);
     }
 }

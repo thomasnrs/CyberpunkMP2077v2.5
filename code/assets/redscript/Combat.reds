@@ -416,14 +416,33 @@ public let m_mpTriggerEffectLogged: Bool;
 // own fire animation), and it fires the way the AI faces - the Relaxed lock in Hackable.reds
 // pulls the AI back after each shot. Combat flag + Shoot event alone looked right once and
 // not again.
+// The command in flight, so DeletePuppet can cancel it first: a puppet replaced while one was
+// running (getting up re-sends it) took the game down inside the engine, reading 0xFFFF....
+@addField(ScriptedPuppet)
+public let m_mpShootCommand: ref<AIForceShootCommand>;
+
+public func MpCancelShootCommand(puppet: ref<ScriptedPuppet>) -> Void {
+    if IsDefined(puppet) && IsDefined(puppet.m_mpShootCommand) {
+        puppet.GetAIControllerComponent().CancelCommand(puppet.m_mpShootCommand);
+        puppet.m_mpShootCommand = null;
+    }
+}
+
 public func MpTryRecoil(puppet: ref<ScriptedPuppet>, weapon: ref<WeaponObject>) -> Void {
+    // Down means not shooting - and a downed puppet is the one about to be replaced.
+    if puppet.m_mpServerDowned {
+        return;
+    }
+
     let combat = new AnimFeature_CombatState();
     combat.isInCombat = true;
     AnimationControllerComponent.ApplyFeatureToReplicate(puppet, n"CombatState", combat);
 
+    MpCancelShootCommand(puppet);
     let shoot = new AIForceShootCommand();
     shoot.duration = 0.3;
     shoot.immediately = true;
+    puppet.m_mpShootCommand = shoot;
     puppet.GetAIControllerComponent().SendCommand(shoot);
 
     let trigger = weapon.GetTriggerEffectName();
