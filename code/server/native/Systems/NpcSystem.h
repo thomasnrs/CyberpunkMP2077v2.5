@@ -42,6 +42,7 @@ private:
     std::filesystem::path m_statePath;
 
     bool m_walkerEnabled{false};
+    std::string m_walkerRecord{"Character.WaMuppet"};
     flecs::entity m_walker;
     glm::vec3 m_walkerCenter{};
     std::chrono::steady_clock::time_point m_walkerStart{};

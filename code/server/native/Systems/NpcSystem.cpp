@@ -23,9 +23,24 @@ NpcSystem::NpcSystem(gsl::not_null<World*> apWorld)
     Load();
 
     std::error_code ec;
-    m_walkerEnabled = std::filesystem::exists(GetPath() / "config" / "walker.on", ec);
+    const auto walkerFile = GetPath() / "config" / "walker.on";
+    m_walkerEnabled = std::filesystem::exists(walkerFile, ec);
     if (m_walkerEnabled)
-        spdlog::warn("[Walker] config/walker.on found - a debug walker will circle the first player to spawn");
+    {
+        // The file's first line, when present, names the record to build the walker from -
+        // so a puppet experiment (player body vs a real NPC body) is a file edit and a
+        // restart rather than a rebuild.
+        std::ifstream file(walkerFile);
+        std::string record;
+        std::getline(file, record);
+        while (!record.empty() && std::isspace(static_cast<unsigned char>(record.back())))
+            record.pop_back();
+        if (!record.empty())
+            m_walkerRecord = record;
+
+        spdlog::warn("[Walker] config/walker.on found - a debug walker ({}) will circle the first player to spawn",
+                     m_walkerRecord);
+    }
 }
 
 void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcept
@@ -75,8 +90,10 @@ void NpcSystem::UpdateWalker(std::chrono::steady_clock::time_point aNow) noexcep
         // Where the lap starts (angle 0), not on top of the player. Wearing the player's own
         // appearance: the bare mannequin floated upside down and no shot ever registered on
         // it, so it was no stand-in for a real remote player. A clone is.
-        m_walker = Spawn("Character.WaMuppet", "Walker", m_walkerCenter + glm::vec3{2.f, 0.f, 0.f}, 0.f,
-                         anchorPuppet.get<AppearanceComponent>());
+        // The appearance only fits the player-body records; a real NPC body keeps its own.
+        const bool playerBody = m_walkerRecord.find("Muppet") != std::string::npos;
+        m_walker = Spawn(m_walkerRecord, "Walker", m_walkerCenter + glm::vec3{2.f, 0.f, 0.f}, 0.f,
+                         playerBody ? anchorPuppet.get<AppearanceComponent>() : nullptr);
         if (auto* pNpc = m_walker.get_mut<NpcComponent>())
             pNpc->Transient = true;
         m_walker.set<HealthComponent>({});
