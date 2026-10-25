@@ -70,6 +70,13 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     // common case rather than an error.
     let targetId = network.GetServerIdByEntity(target.GetEntityID());
     if Equals(targetId, 0ul) {
+        // One ordinary NPC's components, to compare against a remote puppet's.
+        let me = GetPlayer(GetGameInstance());
+        if IsDefined(me) && !me.m_mpNpcComponentsDumped && !target.HasTag(n"CyberpunkMP.Puppet") {
+            me.m_mpNpcComponentsDumped = true;
+            MpDumpComponents(target, s"hit NPC \(NameToString(target.GetClassName()))");
+        }
+
         if target.HasTag(n"CyberpunkMP.Puppet") {
             MpFTLog(s"[Combat] hit on remote puppet \(EntityID.GetHash(target.GetEntityID())) dropped - no server id for it");
         }

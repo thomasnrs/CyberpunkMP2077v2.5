@@ -139,6 +139,39 @@ protected cb func OnHighLevelStateDataEvent(evt: ref<gameHighLevelStateDataEvent
     return result;
 }
 
+/**
+ * Every component on an entity, by class, with the disabled ones marked.
+ *
+ * Shots and punches pass straight through remote players without a single hit event (not
+ * even the [HitShape] line every NPC hit produces), so the puppet is missing something an
+ * NPC has. Logged for a remote puppet when it attaches and for the first ordinary NPC that
+ * gets hit, the two lists say what.
+ */
+public func MpDumpComponents(entity: ref<Entity>, label: String) -> Void {
+    if !IsDefined(entity) {
+        return;
+    }
+
+    let components = entity.GetComponents();
+    let names = "";
+    let i = 0;
+    while i < ArraySize(components) {
+        if IsDefined(components[i]) {
+            names += NameToString(components[i].GetClassName());
+            if !components[i].IsEnabled() {
+                names += "(off)";
+            }
+            names += " ";
+        }
+        i += 1;
+    }
+
+    MpFTLog(s"[Components] \(label): \(ArraySize(components)) - \(names)");
+}
+
+@addField(PlayerPuppet)
+public let m_mpNpcComponentsDumped: Bool;
+
 public static func MpGodModeRecheckSeconds() -> Float = 1.0
 
 public func MpStripInheritedGodMode(entity: ref<GameObject>) -> Void {
@@ -196,6 +229,7 @@ public class MpGodModeRecheckCallback extends DelayCallback {
             return;
         }
         MpClearRecordGodMode(this.entity, "recheck");
+        MpDumpComponents(this.entity, s"remote puppet \(EntityID.GetHash(this.entity.GetEntityID()))");
 
         // Streamed in while already down: draw it that way.
         let network = GameInstance.GetNetworkWorldSystem();
