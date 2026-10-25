@@ -409,7 +409,12 @@ bool VehicleSystem::HandleVehicleLoadMessage(const PacketEvent<server::NotifyVeh
     // Both of these returned silently, and a remote car that never appears looked exactly like
     // one that appeared and was never reported ready - no session on 2.5 has logged
     // OnVehicleReady once.
-    if (!Red::Detail::CallFunctionWithArgs(nullptr, m_pSpawnVehicle, handle, id, aMessage.get_tweak_id(), position, rotation))
+    // A TweakDBID, not the raw uint64 off the wire: CallFunctionWithArgs checks every argument
+    // against the script signature and refused Uint64 for SpawnVehicle(type: TweakDBID, ...) -
+    // which is why no remote car was ever built on 2.5 and everyone else's ride stayed
+    // invisible, the driver standing at the door until they got out.
+    const Red::TweakDBID tweak(aMessage.get_tweak_id());
+    if (!Red::Detail::CallFunctionWithArgs(nullptr, m_pSpawnVehicle, handle, id, tweak, position, rotation))
     {
         spdlog::warn("[VehicleDup] SpawnVehicle call failed for server vehicle {}", aMessage.get_id());
         return false;
@@ -586,9 +591,10 @@ bool VehicleSystem::HandleVehicleExitMessage(const PacketEvent<server::NotifyVeh
     if (character.hash != 0)
     {
         const auto handle = Red::Handle(this);
-        bool res;
+        bool res = false;
         spdlog::info("[VehicleSystem] HandleVehicleExitMessage: ExitVehicle vcall");
-        Red::Detail::CallFunctionWithArgs(nullptr, m_pExitVehicle, handle, res, character);
+        if (!Red::Detail::CallFunctionWithArgs(nullptr, m_pExitVehicle, handle, res, character))
+            spdlog::warn("[VehicleSystem] HandleVehicleExitMessage: ExitVehicle call itself failed (argument types?)");
         spdlog::info("[VehicleSystem] HandleVehicleExitMessage: ExitVehicle returned {}", res);
     }
     else
@@ -716,7 +722,7 @@ void VehicleSystem::DoMount(flecs::entity aCharacter, Red::EntityID aVehicle, Re
     const auto character = worldSystem->GetEntityIdByServerId(aCharacter);
     const auto vehicle = Red::Cast<Red::vehicle::WheeledBaseObject>(worldSystem->GetEntity(aVehicle));
     const auto handle = Red::Handle(this);
-    bool res;
+    bool res = false;
 
     if (!vehicle)
     {
@@ -736,7 +742,8 @@ void VehicleSystem::DoMount(flecs::entity aCharacter, Red::EntityID aVehicle, Re
     spdlog::info("[VehicleSystem] DoMount: entering character {:x} into vehicle {:x} seat {} ({})",
                  character.hash, vehicle->id.hash, aSit.hash,
                  (m_vehicleGameId && *m_vehicleGameId == aVehicle) ? "OUR live car" : "network copy");
-    Red::Detail::CallFunctionWithArgs(nullptr, m_pEnterVehicle, handle, res, character, vehicle->id, aSit);
+    if (!Red::Detail::CallFunctionWithArgs(nullptr, m_pEnterVehicle, handle, res, character, vehicle->id, aSit))
+        spdlog::warn("[VehicleSystem] DoMount: EnterVehicle call itself failed (argument types?)");
     spdlog::info("[VehicleSystem] DoMount: EnterVehicle returned {}", res);
 
     if (aCharacter && aCharacter.is_alive())
