@@ -335,6 +335,7 @@ public func MpDrawRemoteWeapon(network: ref<NetworkWorldSystem>, serverId: Uint6
     transactions.AddItemToSlot(puppet, slot, item);
     puppet.m_mpHeldWeapon = weaponId;
     MpSetCombatStance(puppet, true);
+    MpNextRecoilCandidate(puppet);
 
     MpFTLog(s"[Weapon] remote \(serverId) drew \(weaponId)");
 }
@@ -411,12 +412,47 @@ public func MpRemoteFire(puppet: ref<ScriptedPuppet>) -> Void {
 @addField(ScriptedPuppet)
 public let m_mpTriggerEffectLogged: Bool;
 
-public func MpTryRecoil(puppet: ref<ScriptedPuppet>, weapon: ref<WeaponObject>) -> Void {
-    let combat = new AnimFeature_CombatState();
-    combat.isInCombat = true;
-    AnimationControllerComponent.ApplyFeatureToReplicate(puppet, n"CombatState", combat);
+// TEMPORARY, round 2 again (now with the flash): the pick got muddled between sessions -
+// "perfect" was said of candidate 4, and candidate 2 was remembered. Each draw moves to the
+// next one and names it on screen until the right one is chosen with the name in front of us.
+@addField(ScriptedPuppet)
+public let m_mpRecoilCandidate: Int32;
 
-    AnimationControllerComponent.PushEvent(puppet, n"Shoot");
+public func MpRecoilCandidateName(index: Int32) -> String {
+    switch index {
+        case 0: return "1 combate na animacao";
+        case 1: return "2 combate na animacao + Shoot";
+        case 2: return "3 comando de atirar da IA";
+        default: return "4 comando de atirar + combate";
+    }
+}
+
+public func MpNextRecoilCandidate(puppet: ref<ScriptedPuppet>) -> Void {
+    puppet.m_mpRecoilCandidate = (puppet.m_mpRecoilCandidate + 1) % 4;
+    let name = MpRecoilCandidateName(puppet.m_mpRecoilCandidate);
+    MpShowDownedMessage(s"TESTE TIRO: \(name)", 5.0);
+    MpFTLog(s"[Weapon] recoil candidate now \(puppet.m_mpRecoilCandidate) - \(name)");
+}
+
+public func MpTryRecoil(puppet: ref<ScriptedPuppet>, weapon: ref<WeaponObject>) -> Void {
+    let candidate = puppet.m_mpRecoilCandidate;
+
+    if candidate == 0 || candidate == 1 || candidate == 3 {
+        let combat = new AnimFeature_CombatState();
+        combat.isInCombat = true;
+        AnimationControllerComponent.ApplyFeatureToReplicate(puppet, n"CombatState", combat);
+    }
+
+    if candidate == 1 {
+        AnimationControllerComponent.PushEvent(puppet, n"Shoot");
+    }
+
+    if candidate == 2 || candidate == 3 {
+        let shoot = new AIForceShootCommand();
+        shoot.duration = 0.3;
+        shoot.immediately = true;
+        puppet.GetAIControllerComponent().SendCommand(shoot);
+    }
 
     let trigger = weapon.GetTriggerEffectName();
     if NotEquals(trigger, n"") && NotEquals(trigger, n"None") {
