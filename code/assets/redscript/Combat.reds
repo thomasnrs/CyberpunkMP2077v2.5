@@ -58,7 +58,7 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
     if ArraySize(evt.hitRepresentationResult.hitShapes) > 0 {
         let probe = evt.hitRepresentationResult.hitShapes[0];
 
-        FTLog(s"[HitShape] '\(NameToString(probe.hitShapeName))' material '\(NameToString(probe.physicsMaterial))'");
+        MpFTLog(s"[HitShape] '\(NameToString(probe.hitShapeName))' material '\(NameToString(probe.physicsMaterial))'");
     }
 
     let network = GameInstance.GetNetworkWorldSystem();
@@ -192,7 +192,7 @@ public func MpReportTakedown(network: ref<NetworkWorldSystem>, target: ref<Scrip
         false,
         false);
 
-    FTLog(s"[Combat] knocked remote entity \(targetId) out - reported as a takedown");
+    MpFTLog(s"[Combat] knocked remote entity \(targetId) out - reported as a takedown");
 }
 
 public class MpRefillPuppetHealthCallback extends DelayCallback {
@@ -233,7 +233,7 @@ public func MpApplyRemoteLifeStates(network: ref<NetworkWorldSystem>) -> Void {
 public func MpDrawRemoteLifeState(network: ref<NetworkWorldSystem>, serverId: Uint64, state: Uint32) -> Void {
     let entityId = network.GetEntityIdByServerId(serverId);
     if !EntityID.IsDefined(entityId) {
-        FTLog(s"[Combat] entity \(serverId) changed life state but is not spawned here - drawn when it streams in");
+        MpFTLog(s"[Combat] entity \(serverId) changed life state but is not spawned here - drawn when it streams in");
         return;
     }
 
@@ -245,14 +245,14 @@ public func MpDrawRemoteLifeState(network: ref<NetworkWorldSystem>, serverId: Ui
     if NotEquals(state, 0u) {
         puppet.m_mpServerDowned = true;
         StatusEffectHelper.ApplyStatusEffect(puppet, t"BaseStatusEffect.Defeated");
-        FTLog(s"[Combat] remote entity \(serverId) is down (state \(state)) - Defeated applied");
+        MpFTLog(s"[Combat] remote entity \(serverId) is down (state \(state)) - Defeated applied");
         return;
     }
 
     puppet.m_mpServerDowned = false;
     StatusEffectHelper.RemoveStatusEffect(puppet, t"BaseStatusEffect.Defeated");
     StatusEffectHelper.RemoveStatusEffect(puppet, t"BaseStatusEffect.Unconscious");
-    FTLog(s"[Combat] remote entity \(serverId) is back up");
+    MpFTLog(s"[Combat] remote entity \(serverId) is back up");
 }
 
 /**
@@ -303,7 +303,7 @@ public func MpReportStatusEffect(target: ref<ScriptedPuppet>, evt: ref<ApplyStat
 
     if drops && !target.m_mpServerDowned {
         StatusEffectHelper.RemoveStatusEffect(target, effectId);
-        FTLog(s"[Combat] took \(TDBID.ToNumber(effectId)) back off remote entity \(targetId) - only the server downs players");
+        MpFTLog(s"[Combat] took \(TDBID.ToNumber(effectId)) back off remote entity \(targetId) - only the server downs players");
 
         if unconscious && Equals(evt.instigatorEntityID, player.GetEntityID()) {
             MpReportTakedown(network, target, targetId);
@@ -352,7 +352,7 @@ public class MpStatusEffectPoll extends DelayCallback {
 
                 while NotEquals(effect, 0ul) {
                     StatusEffectHelper.ApplyStatusEffect(player, network.TdbidFromNumber(effect));
-                    FTLog(s"[Combat] a quickhack landed on us: \(effect)");
+                    MpFTLog(s"[Combat] a quickhack landed on us: \(effect)");
 
                     effect = network.ConsumeIncomingStatusEffect();
                 }
@@ -686,7 +686,7 @@ public func MpApplyServerHealth(player: ref<PlayerPuppet>, network: ref<NetworkW
 
     pools.RequestSettingStatPoolValue(id, gamedataStatPoolType.Health, target, player, false);
 
-    FTLog(s"[Combat] server set our health to \(target)");
+    MpFTLog(s"[Combat] server set our health to \(target)");
 }
 
 /**

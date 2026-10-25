@@ -49,10 +49,10 @@ public class ChatController extends inkHUDGameController {
     private let m_nameLabel: wref<inkText>;
 
     protected cb func OnInitialize() -> Bool {
-        FTLog(s"[ChatController] OnInitialize");
+        MpFTLog(s"[ChatController] OnInitialize");
         this.m_player = this.GetPlayerControlledObject() as PlayerPuppet;
         if !IsDefined(this.m_player) {
-            FTLog(s"[ChatController] NO PLAYER");
+            MpFTLog(s"[ChatController] NO PLAYER");
         }
         this.m_uiSystem = GameInstance.GetUISystem(this.m_player.GetGame());
         this.m_messageController = inkWidgetRef.GetController(this.m_messagesRef) as ListController;
@@ -171,7 +171,7 @@ public class ChatController extends inkHUDGameController {
     }
 
     protected cb func OnUninitialize() -> Bool {
-        FTLog(s"[ChatController] OnUninitialize");
+        MpFTLog(s"[ChatController] OnUninitialize");
         this.m_player.UnregisterInputListener(this, n"UIEnterChatMessage");
     }
 
@@ -189,7 +189,7 @@ public class ChatController extends inkHUDGameController {
     }
 
     protected cb func OnChatMessageUIEvent(evt: ref<ChatMessageUIEvent>) -> Bool {
-        FTLog(s"[ChatController] OnChatMessageUIEvent");
+        MpFTLog(s"[ChatController] OnChatMessageUIEvent");
 
         // Re-asserted on every message, not just at init.
         //
@@ -225,7 +225,7 @@ public class ChatController extends inkHUDGameController {
 
     // The server wants a name for this character.
     protected cb func OnCharacterNameRequest(evt: ref<CharacterNameRequest>) -> Bool {
-        FTLog(s"[ChatController] character name requested (currently '\(evt.m_current)')");
+        MpFTLog(s"[ChatController] character name requested (currently '\(evt.m_current)')");
 
         this.m_namePromptOpen = true;
         this.m_pendingName = "";
@@ -267,7 +267,7 @@ public class ChatController extends inkHUDGameController {
 
             let parent = this.GetWidget(n"wrapper/input_box") as inkCompoundWidget;
             if !IsDefined(parent) {
-                FTLogWarning(s"[ChatController] no input_box to hang the name label on");
+                MpFTLogWarning(s"[ChatController] no input_box to hang the name label on");
                 return;
             }
 
@@ -327,7 +327,7 @@ public class ChatController extends inkHUDGameController {
         notice.message = s"You typed \"\(wanted)\" (\(spelled)). Names are permanent - press Enter again to keep it, or fix it first.";
         this.QueueEvent(notice);
 
-        FTLog(s"[ChatController] name read back for confirmation '\(wanted)'");
+        MpFTLog(s"[ChatController] name read back for confirmation '\(wanted)'");
         return false;
     }
 
@@ -346,7 +346,7 @@ public class ChatController extends inkHUDGameController {
         // Sent as the ordinary /name command. The server already validates, truncates to 32
         // and writes it through to the character record, so this reuses that rather than
         // adding a second path to the same field.
-        FTLog(s"[ChatController] naming this character '\(wanted)'");
+        MpFTLog(s"[ChatController] naming this character '\(wanted)'");
         GameInstance.GetNetworkWorldSystem().GetChatSystem().Send("/name " + wanted);
     }
 
@@ -435,7 +435,7 @@ public class ChatController extends inkHUDGameController {
     public final func MpTrOpen() -> Void {
         let root = this.GetRootCompoundWidget();
         if !IsDefined(root) {
-            FTLog(s"[TradeScreen] no root compound widget - cannot open");
+            MpFTLog(s"[TradeScreen] no root compound widget - cannot open");
             return;
         }
 
@@ -514,7 +514,7 @@ public class ChatController extends inkHUDGameController {
         // Frosted backdrop behind the see-through boxes. Standalone call (no modal context push),
         // so worst case it simply does not blur - it cannot hide the HUD or trap input.
         PopupStateUtils.SetBackgroundBlur(this, true);
-        FTLog(s"[TradeScreen] opened - root \(rootSize.X)x\(rootSize.Y) scale \(scale) fracX \(this.m_trFracX) fracY \(this.m_trFracY) zoom \(this.m_trZoom) gap \(this.m_trGap)");
+        MpFTLog(s"[TradeScreen] opened - root \(rootSize.X)x\(rootSize.Y) scale \(scale) fracX \(this.m_trFracX) fracY \(this.m_trFracY) zoom \(this.m_trZoom) gap \(this.m_trGap)");
     }
 
     public final func MpTrClose() -> Void {
@@ -532,7 +532,7 @@ public class ChatController extends inkHUDGameController {
             this.m_trOpen = false;
         }
         PopupStateUtils.SetBackgroundBlur(this, false);
-        FTLog(s"[TradeScreen] closed");
+        MpFTLog(s"[TradeScreen] closed");
     }
 
     private final func MpTrEddies(delta: Int32) -> Void {
@@ -545,7 +545,7 @@ public class ChatController extends inkHUDGameController {
     private final func MpTrActivate() -> Void {
         // Cancel (0) and Exit (2) just close; Confirm (1) will commit once the trade data wire
         // exists - for now it logs and closes like the others.
-        if this.m_trSel == 1 { FTLog(s"[TradeScreen] confirm (mock)"); }
+        if this.m_trSel == 1 { MpFTLog(s"[TradeScreen] confirm (mock)"); }
         this.MpTrClose();
     }
 
@@ -600,7 +600,7 @@ public class ChatController extends inkHUDGameController {
             return;
         }
         if NotEquals(textEntered, "") {
-            FTLog(s"[ChatController] SendChat \"\(textEntered)\"");
+            MpFTLog(s"[ChatController] SendChat \"\(textEntered)\"");
 
             GameInstance.GetNetworkWorldSystem().GetChatSystem().Send(textEntered);
         };

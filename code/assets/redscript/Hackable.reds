@@ -70,7 +70,7 @@ public func MpTryMakeHackable(entity: ref<GameObject>) -> Void {
     let mine = player.GetAttitudeAgent();
 
     if !IsDefined(theirs) || !IsDefined(mine) {
-        FTLogWarning(s"[Hackable] no attitude agent on \(EntityID.GetHash(entity.GetEntityID())) - it will not be targetable");
+        MpFTLogWarning(s"[Hackable] no attitude agent on \(EntityID.GetHash(entity.GetEntityID())) - it will not be targetable");
         return;
     }
 
@@ -79,7 +79,7 @@ public func MpTryMakeHackable(entity: ref<GameObject>) -> Void {
     // one player, and says nothing about how the rest of the world should feel about them.
     theirs.SetAttitudeTowards(mine, EAIAttitude.AIA_Hostile);
 
-    FTLog(s"[Hackable] \(EntityID.GetHash(entity.GetEntityID())) is now a valid combat and quickhack target");
+    MpFTLog(s"[Hackable] \(EntityID.GetHash(entity.GetEntityID())) is now a valid combat and quickhack target");
 }
 
 /**
@@ -132,11 +132,11 @@ public func MpClearRecordGodMode(entity: ref<GameObject>, when: String) -> Void 
     let immortal = gods.GetGodModeSources(id, gameGodModeType.Immortal);
 
     if ArraySize(invulnerable) == 0 && ArraySize(immortal) == 0 {
-        FTLog(s"[Hackable] \(when): \(EntityID.GetHash(id)) has no god mode - damageable");
+        MpFTLog(s"[Hackable] \(when): \(EntityID.GetHash(id)) has no god mode - damageable");
         return;
     }
 
-    FTLogWarning(s"[Hackable] \(when): \(EntityID.GetHash(id)) had god mode - Invulnerable from [\(MpJoinNames(invulnerable))], Immortal from [\(MpJoinNames(immortal))] - clearing 'Default'");
+    MpFTLogWarning(s"[Hackable] \(when): \(EntityID.GetHash(id)) had god mode - Invulnerable from [\(MpJoinNames(invulnerable))], Immortal from [\(MpJoinNames(immortal))] - clearing 'Default'");
     gods.ClearGodMode(id, n"Default");
 }
 

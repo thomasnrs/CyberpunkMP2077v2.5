@@ -34,7 +34,7 @@ public class MpTakeDriverSeatCallback extends DelayCallback {
 
         GameInstance.GetMountingFacility(GetGameInstance()).Mount(request);
 
-        FTLog(s"[NetworkWorldSystem] took the driver seat of \(EntityID.GetHash(this.vehicleId))");
+        MpFTLog(s"[NetworkWorldSystem] took the driver seat of \(EntityID.GetHash(this.vehicleId))");
     }
 }
 
@@ -531,7 +531,7 @@ public native class NetworkWorldSystem extends IGameSystem {
         // mannequin, which is at least known to work.
         let id = TDBID.Create(record);
         if !TDBID.IsValid(id) {
-            FTLogError(s"[NetworkWorldSystem] no such record '\(record)' - falling back to the muppet");
+            MpFTLogError(s"[NetworkWorldSystem] no such record '\(record)' - falling back to the muppet");
             id = isMale ? t"Character.MaMuppet" : t"Character.WaMuppet";
         }
 
@@ -572,13 +572,13 @@ public native class NetworkWorldSystem extends IGameSystem {
     public func TakeDriverSeat(vehicleId: EntityID) -> Void {
         let player = GetPlayer(GetGameInstance());
         if !IsDefined(player) {
-            FTLogError(s"[NetworkWorldSystem] driver seat assigned with no local player");
+            MpFTLogError(s"[NetworkWorldSystem] driver seat assigned with no local player");
             return;
         }
 
         let vehicle = GameInstance.FindEntityByID(GetGameInstance(), vehicleId) as VehicleObject;
         if !IsDefined(vehicle) {
-            FTLogError(s"[NetworkWorldSystem] driver seat assigned for a vehicle we do not have");
+            MpFTLogError(s"[NetworkWorldSystem] driver seat assigned for a vehicle we do not have");
             return;
         }
 
@@ -617,7 +617,7 @@ public native class NetworkWorldSystem extends IGameSystem {
     public func TeleportLocalPlayer(position: Vector4, yaw: Float) -> Void {
         let player = GetPlayer(GetGameInstance());
         if !IsDefined(player) {
-            FTLogError(s"[NetworkWorldSystem] teleport arrived with no local player");
+            MpFTLogError(s"[NetworkWorldSystem] teleport arrived with no local player");
             return;
         }
 
@@ -637,7 +637,7 @@ public native class NetworkWorldSystem extends IGameSystem {
         //   2. make the game actually take us out of the seat
         //   3. only then move
         if VehicleComponent.IsMountedToVehicle(GetGameInstance(), player) {
-            FTLog(s"[NetworkWorldSystem] teleport while mounted - forcing an exit first");
+            MpFTLog(s"[NetworkWorldSystem] teleport while mounted - forcing an exit first");
 
             // 1. The network's idea of where we are, corrected before anything moves.
             let vehicles = this.GetVehicleSystem();
@@ -694,7 +694,7 @@ public native class NetworkWorldSystem extends IGameSystem {
         angles.Pitch = 0.0;
         angles.Yaw = yaw * 57.2957795;
 
-        FTLog(s"[NetworkWorldSystem] teleporting to \(position.X), \(position.Y), \(position.Z)");
+        MpFTLog(s"[NetworkWorldSystem] teleporting to \(position.X), \(position.Y), \(position.Z)");
         GameInstance.GetTeleportationFacility(GetGameInstance()).Teleport(player, position, angles);
 
         // Fall-through recovery.
@@ -715,7 +715,7 @@ public native class NetworkWorldSystem extends IGameSystem {
         // desynchronised for everybody", which is far harder to recognise for what it is.
         let vehicles = this.GetVehicleSystem();
         if IsDefined(vehicles) && VehicleComponent.IsMountedToVehicle(GetGameInstance(), player) {
-            FTLogWarning(s"[NetworkWorldSystem] still mounted after teleporting - clearing the vehicle link anyway");
+            MpFTLogWarning(s"[NetworkWorldSystem] still mounted after teleporting - clearing the vehicle link anyway");
             vehicles.OnVehicleExit();
         }
     }
@@ -839,9 +839,9 @@ public native class NetworkWorldSystem extends IGameSystem {
         let system = GameInstance.GetCharacterCustomizationSystem(game);
 
         if IsDefined(system) && IsDefined(player) && system.HasCharacterCustomizationComponent(player) {
-            FTLog(s"[Character] the player can be customised - use a mirror, then /character save");
+            MpFTLog(s"[Character] the player can be customised - use a mirror, then /character save");
         } else {
-            FTLogWarning(s"[Character] this player has no customization component");
+            MpFTLogWarning(s"[Character] this player has no customization component");
         }
     }
 
@@ -853,7 +853,7 @@ public native class NetworkWorldSystem extends IGameSystem {
     // second one that would need its own focus handling, its own input context and its own
     // way of being wrong.
     public func RequestCharacterName(current: String) -> Void {
-        FTLog(s"[Character] the server asked for a character name (currently '\(current)')");
+        MpFTLog(s"[Character] the server asked for a character name (currently '\(current)')");
 
         let evt = new CharacterNameRequest();
         evt.m_current = current;

@@ -140,7 +140,7 @@ public func MpRestoreDifficultyChoices(original: array<String>) -> Void {
     option.SetIndex(hardest);
   }
 
-  FTLog(s"[Difficulty] session over - difficulty choices restored (\(ArraySize(original)) options)");
+  MpFTLog(s"[Difficulty] session over - difficulty choices restored (\(ArraySize(original)) options)");
 }
 
 /**

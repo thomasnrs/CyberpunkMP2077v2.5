@@ -108,16 +108,16 @@ public class JobListController extends inkLogicController {
     this.m_headerText.SetText("Select job type");
     this.m_scrollArea = this.GetWidget(n"container/scrollarea") as inkScrollArea;
     if !IsDefined(this.m_scrollArea) {
-        FTLog(s"[JobListController] COULD NOT FIND SCROLLAREA");
+        MpFTLog(s"[JobListController] COULD NOT FIND SCROLLAREA");
     }
     this.m_listController = this.GetWidget(n"container/scrollarea/list").GetController() as ListController;
     if !IsDefined(this.m_listController) {
-        FTLog(s"[JobListController] COULD NOT FIND LIST CONTROLLER");
+        MpFTLog(s"[JobListController] COULD NOT FIND LIST CONTROLLER");
     }
     this.m_scrollArea.RegisterToCallback(n"OnScrollChanged", this, n"OnScrollChanged");
     this.m_scrollController = this.m_scrollArea.GetControllerByType(n"inkScrollController") as inkScrollController;
     if !IsDefined(this.m_scrollController) {
-        FTLog(s"[JobListController] COULD NOT FIND SCROLL CONTROLLER");
+        MpFTLog(s"[JobListController] COULD NOT FIND SCROLL CONTROLLER");
     }
     // this.m_leftMargin = new inkMargin(35.00, 10.00, 0.00, 0.00);
     // this.m_rightMargin = new inkMargin(1400.00, 10.00, 0.00, 0.00);
@@ -155,7 +155,7 @@ public class JobListController extends inkLogicController {
   }
 
   protected cb func OnItemSelected(previous: ref<inkVirtualCompoundItemController>, next: ref<inkVirtualCompoundItemController>) -> Bool {
-    FTLog(s"[JobListController] OnItemSelected");
+    MpFTLog(s"[JobListController] OnItemSelected");
     // let selectionChangeEvent: ref<ContactSelectionChangedEvent>;
     // let contactData: ref<ContactData> = FromVariant<ref<IScriptable>>(next.GetData()) as ContactData;
     // InkImageUtils.RequestAvatarOrUnknown(this, this.m_avatarImage, contactData.avatarID);

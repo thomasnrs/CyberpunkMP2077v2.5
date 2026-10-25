@@ -76,7 +76,7 @@ public func MpApplyImmortality(player: ref<PlayerPuppet>) -> Void {
     let gods = GameInstance.GetGodModeSystem(player.GetGame());
     gods.AddGodMode(player.GetEntityID(), gameGodModeType.Immortal, MpGodModeSource());
 
-    FTLog(s"[Death] immortality applied - the death menu can no longer be reached");
+    MpFTLog(s"[Death] immortality applied - the death menu can no longer be reached");
 }
 
 // Given back on disconnect. Someone who plays the game normally afterwards should be able
@@ -94,7 +94,7 @@ public func MpClearImmortality(player: ref<PlayerPuppet>) -> Void {
     pools.RequestSettingStatPoolValueCustomLimit(Cast<StatsObjectID>(player.GetEntityID()),
                                                  gamedataStatPoolType.Health, 0.0, null);
 
-    FTLog(s"[Death] immortality removed - singleplayer death is back to normal");
+    MpFTLog(s"[Death] immortality removed - singleplayer death is back to normal");
 }
 
 /**
@@ -126,7 +126,7 @@ public func MpGrantReviveGrace(player: ref<PlayerPuppet>) -> Void {
     let gods = GameInstance.GetGodModeSystem(player.GetGame());
     gods.AddGodMode(player.GetEntityID(), gameGodModeType.Invulnerable, MpReviveGraceSource());
 
-    FTLog(s"[Death] revive grace granted - invulnerable for \(MpReviveGraceSeconds())s");
+    MpFTLog(s"[Death] revive grace granted - invulnerable for \(MpReviveGraceSeconds())s");
 
     let expire = new MpReviveGraceExpireCallback();
     expire.player = player;
@@ -144,7 +144,7 @@ public class MpReviveGraceExpireCallback extends DelayCallback {
         let gods = GameInstance.GetGodModeSystem(this.player.GetGame());
         gods.RemoveGodMode(this.player.GetEntityID(), gameGodModeType.Invulnerable, MpReviveGraceSource());
 
-        FTLog(s"[Death] revive grace over");
+        MpFTLog(s"[Death] revive grace over");
     }
 }
 
@@ -229,7 +229,7 @@ public func MpClearWantedLevel() -> Void {
     // system is mid-update with a player it still believes is being shot at.
     GameInstance.GetDelaySystem(game).DelayScriptableSystemRequest(n"PreventionSystem", request, 0.2);
 
-    FTLog(s"[Death] wanted level cleared - police stood down");
+    MpFTLog(s"[Death] wanted level cleared - police stood down");
 }
 
 public class MpDeathGuard extends ScriptStatPoolsListener {
@@ -248,7 +248,7 @@ public class MpDeathGuard extends ScriptStatPoolsListener {
             return false;
         }
 
-        FTLog(s"[Death] downed - reviving instead of flatlining");
+        MpFTLog(s"[Death] downed - reviving instead of flatlining");
 
         MpShowFlatlinedMessage();
         system.RevivePlayer();
@@ -289,7 +289,7 @@ protected cb func OnInitialize() -> Bool {
     let system = GameInstance.GetNetworkWorldSystem();
 
     if IsDefined(system) && system.IsConnected() {
-        FTLogError(s"[Death] the death menu opened on a server - suppressing it");
+        MpFTLogError(s"[Death] the death menu opened on a server - suppressing it");
 
         // Hidden BEFORE anything else, so FLATLINED does not appear for even one frame.
         let root = this.GetRootCompoundWidget();
@@ -370,7 +370,7 @@ public class MpDeathMenuWatchdogCallback extends DelayCallback {
             return;
         }
 
-        FTLogError(s"[Death] the death menu would not close - showing it rather than trapping the player");
+        MpFTLogError(s"[Death] the death menu would not close - showing it rather than trapping the player");
 
         let root = this.controller.GetRootCompoundWidget();
         if IsDefined(root) {

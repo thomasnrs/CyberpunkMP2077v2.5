@@ -268,7 +268,7 @@ public class MpInventory {
     }
 
     if !IsDefined(network) {
-      FTLogError(s"[MpInventory] restore asked for with no network system");
+      MpFTLogError(s"[MpInventory] restore asked for with no network system");
       return;
     }
 

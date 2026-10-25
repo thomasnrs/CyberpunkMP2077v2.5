@@ -216,12 +216,12 @@ public native class AppearanceSystem extends IScriptable {
         let entity = GameInstance.FindEntityByID(GetGameInstance(), entityId) as GameObject;
 
         if !IsDefined(entity) {
-            FTLog(s"[AppearanceSystem] cannot re-dress \(EntityID.GetHash(entityId)) - no entity");
+            MpFTLog(s"[AppearanceSystem] cannot re-dress \(EntityID.GetHash(entityId)) - no entity");
             return;
         }
 
         if this.ApplyAppearance(entity) {
-            FTLog(s"[AppearanceSystem] re-dressed \(EntityID.GetHash(entityId))");
+            MpFTLog(s"[AppearanceSystem] re-dressed \(EntityID.GetHash(entityId))");
         }
     }
 

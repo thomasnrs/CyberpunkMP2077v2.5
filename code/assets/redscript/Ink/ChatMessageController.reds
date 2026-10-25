@@ -11,7 +11,7 @@ public class ChatMessageController extends ListItemController {
     public let m_messageLabel: wref<inkText>;
 
     protected cb func OnInitialize() -> Bool {
-        FTLog(s"[ChatMessageController] OnInitialize");
+        MpFTLog(s"[ChatMessageController] OnInitialize");
         // super.OnInitialize();
         this.m_authorLabel = inkTextRef.Get(this.m_authorWidget) as inkText;
         this.m_messageLabel = inkTextRef.Get(this.m_messageWidget) as inkText;
@@ -23,7 +23,7 @@ public class ChatMessageController extends ListItemController {
     }
 
     protected cb func OnDataChanged(value: ref<IScriptable>) -> Bool {
-        FTLog(s"[ChatMessageController] OnDataChanged");
+        MpFTLog(s"[ChatMessageController] OnDataChanged");
         // super.OnDataChanged(value);
         this.m_data = value as ChatMessageData;
         this.Apply();
@@ -72,7 +72,7 @@ public class ChatMessageController extends ListItemController {
     }
 
     protected cb func OnAddedToList(target: wref<ListItemController>) -> Bool {
-        // FTLog(s"[ChatMessageController] OnAddedToList");
+        // MpFTLog(s"[ChatMessageController] OnAddedToList");
         let m_animListText: ref<inkAnimDef>;
         let m_animTextInterp: ref<inkAnimTextOffset>;
         let stageOneTime: Float;
