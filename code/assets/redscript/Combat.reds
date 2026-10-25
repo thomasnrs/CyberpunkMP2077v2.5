@@ -26,14 +26,18 @@ import CyberpunkMP.World.*
  */
 
 // gamedataStatPoolType.Health is what a weapon spends. Named here so the intent survives.
-@wrapMethod(ScriptedPuppet)
-protected cb func OnHit(evt: ref<gameHitEvent>) -> Bool {
+//
+// DamagePipelineFinalized, not OnHit. On 2.5 OnHit arrives before the damage pipeline has run
+// and evt.attackComputed is null there, so every hit on a remote player reported 0 damage and
+// stopped at the damage <= 0 check. This runs once the engine has computed the attack - the
+// same hook VehicleDamageProbe has always read correct values from - and before it is applied.
+@wrapMethod(NPCPuppet)
+protected func DamagePipelineFinalized(evt: ref<gameHitEvent>) -> Void {
     MpReportHit(this, evt);
 
-    // Always chain. Suppressing the game's own hit handling would cost the hit reaction,
-    // the blood, the impact sound and the stagger - all the things that make a shot read as
-    // a shot - and we would then have to rebuild every one of them.
-    return wrappedMethod(evt);
+    // Always chain. Suppressing the game's own handling would cost the hit reaction, the
+    // blood, the impact sound and the stagger - and we would then have to rebuild them.
+    wrappedMethod(evt);
 }
 
 /**
