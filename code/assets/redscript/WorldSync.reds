@@ -220,6 +220,10 @@ public func MpSetWorldSyncHidden(npc: ref<NPCPuppet>, player: ref<PlayerPuppet>,
 }
 
 public static func MpWorldNpcRange() -> Float = 60.0
+public static func MpWorldNpcKeepRange() -> Float = 85.0
+
+@addField(ScriptedPuppet)
+public let m_mpWorldReported: Bool;
 public static func MpWorldNpcMaxPerReport() -> Int32 = 40
 
 public class MpWorldNpcReportPoll extends DelayCallback {
@@ -233,10 +237,12 @@ public class MpWorldNpcReportPoll extends DelayCallback {
 
         MpReportWorldNpcs(this.owner);
 
+        // 30/s, the rate players send at. At 10/s the mirrors' interpolation - built for
+        // 30/s - ran dry on ~22% of frames and guessed, then jumped when the truth arrived.
         let again = new MpWorldNpcReportPoll();
         again.owner = this.owner;
         again.token = this.token;
-        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.1, false);
+        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.033, false);
     }
 }
 
@@ -281,8 +287,14 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
                 speed = Vector4.Distance(position, service.lastPositions[i]) / (now - lastTime);
             }
 
-            if !npc.IsCrowd() && reported < MpWorldNpcMaxPerReport()
-                && Vector4.Distance(position, center) <= range {
+            // In at the range, out only well past it: an NPC pacing along the edge was
+            // reported, dropped and reported again, and every drop deleted and re-created its
+            // mirror somewhere else - the "vanished" and "teleported" ones.
+            let distance = Vector4.Distance(position, center);
+            let inRange = distance <= range || (npc.m_mpWorldReported && distance <= MpWorldNpcKeepRange());
+            npc.m_mpWorldReported = inRange && !npc.IsCrowd();
+
+            if !npc.IsCrowd() && reported < MpWorldNpcMaxPerReport() && inRange {
                 // Yaw 0 looks down +Y; forward at yaw a is (-sin a, cos a).
                 let forward = npc.GetWorldForward();
                 network.ReportWorldNpc(

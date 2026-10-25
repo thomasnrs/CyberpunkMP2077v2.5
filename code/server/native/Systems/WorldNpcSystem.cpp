@@ -16,8 +16,10 @@
 
 namespace
 {
-// A mirror the host has stopped reporting - despawned on their side, or out of range.
-constexpr auto kMirrorTimeout = std::chrono::seconds(2);
+// A mirror the host has stopped reporting - despawned on their side, or out of range. Long
+// enough to ride out a skipped report or a hitch: every expiry deletes the mirror and a
+// returning NPC is re-created somewhere else, which players see as a vanish and a teleport.
+constexpr auto kMirrorTimeout = std::chrono::seconds(5);
 
 // Re-sent this often so a player who joins late learns who the host is.
 constexpr auto kHostBroadcastInterval = std::chrono::seconds(5);
