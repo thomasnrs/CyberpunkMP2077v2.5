@@ -121,11 +121,13 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
         return;
     }
 
-    // As a share of the body that took it. The server's pool is 0..100, and the raw figure is
-    // in the hit body's own hit points - a punch on a hitbox came to 172 and downed a player
-    // outright. A tenth of the hitbox's health is a tenth of the player's.
+    // As a share of a PLAYER's health. The server's pool is 0..100 and the raw figure is in hit
+    // points: unscaled, one punch (172) downed a player outright; scaled by the hitbox's own
+    // pool it took ~450 shots, because the hitbox is Panam and she has 46,800. Our own maximum
+    // is the yardstick instead - what this hit would take from someone like us - which is fair
+    // while players are of a similar level.
     let maxHealth = GameInstance.GetStatPoolsSystem(target.GetGame())
-        .GetStatPoolMaxPointValue(Cast<StatsObjectID>(target.GetEntityID()), gamedataStatPoolType.Health);
+        .GetStatPoolMaxPointValue(Cast<StatsObjectID>(player.GetEntityID()), gamedataStatPoolType.Health);
     let raw = damage;
     if maxHealth > 0.0 {
         damage = raw * 100.0 / maxHealth;
