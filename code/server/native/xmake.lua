@@ -1,6 +1,9 @@
 target("Server.Native")
     set_kind("shared")
     set_group("Server")
+    -- A PDB beside the DLL in every mode: a release crash dump without one names nothing
+    -- past "Server_Native!IWorld::Get+0x75d1b".
+    set_symbols("debug")
     add_files("**.cpp")
     
     add_headerfiles("**.h", "**.hpp", "**.inl")

@@ -20,7 +20,11 @@
 
 World::World(const FlecsConfig& acFlecsConfig)
 {
-    set_entity_range(1, 5'000'000);
+    // Our entity ids are the clients' flecs ids too (they make_alive the same number), so
+    // they start well clear of what a client's world keeps for itself - flecs' builtin
+    // entities sit at 256..383. Numbered from 1, the server reached 256 once world NPC
+    // mirrors came and went fast enough, and the client deleted flecs' own module entity.
+    set_entity_range(100'000, 5'000'000);
 
     emplace<Level>(this);
     emplace<PlayerManager>(this);

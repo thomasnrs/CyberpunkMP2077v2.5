@@ -52,8 +52,22 @@ NetworkWorldSystem::NetworkWorldSystem()
     set_entity_range(10'000'000, 20'000'000);
 }
 
+bool NetworkWorldSystem::IsUsableServerId(uint64_t aServerId)
+{
+    const auto index = static_cast<uint32_t>(aServerId);
+    return index >= EcsFirstUserEntityId && index < 10'000'000;
+}
+
 bool NetworkWorldSystem::Spawn(uint64_t aServerId, const Red::Vector4& aPosition, const Red::Quaternion& aRotation, const Red::DynArray<Red::TweakDBID>& aEquipment, const Vector<uint8_t> aCcstate, bool aIsMale, const std::string& acUsername, const std::string& acRecord)
 {
+    if (!IsUsableServerId(aServerId))
+    {
+        spdlog::error("[Spawn] remote id {} would land on one of this world's own flecs ids - refused "
+                      "(a server that numbers its entities from 1; update it)",
+                      aServerId);
+        return false;
+    }
+
     // Not ready is a WHEN problem, not a whether problem. The server front-loads
     // everyone already online the moment we join, which can beat the world attach -
     // dropping those spawns meant whoever was online first simply never existed for
@@ -68,7 +82,9 @@ bool NetworkWorldSystem::Spawn(uint64_t aServerId, const Red::Vector4& aPosition
     // A spawn for an id we already track replaces the old puppet instead of standing a
     // second copy next to it. Reconnects re-announce, and a missed unload in between
     // used to leave a frozen duplicate behind forever.
-    if (GetEntityByServerId(aServerId))
+    // Only ever one of OUR puppets: an alive id without them is nothing to replace.
+    if (const auto existing = GetEntityByServerId(aServerId);
+        existing && existing.is_alive() && (existing.has<EntityComponent>() || existing.has<SpawningComponent>()))
     {
         spdlog::info("[Spawn] remote id {} already has a puppet - replacing it", aServerId);
         DeSpawn(aServerId);
@@ -172,6 +188,10 @@ void NetworkWorldSystem::DeSpawn(uint64_t aServerId) const
     // player left again before our world even finished loading.
     std::erase_if(const_cast<NetworkWorldSystem*>(this)->m_pendingSpawns,
                   [aServerId](const PendingSpawn& s) { return s.ServerId == aServerId; });
+
+    // Never destruct an id this world keeps for itself, whatever the server says.
+    if (!IsUsableServerId(aServerId))
+        return;
 
     const auto entity = GetEntityByServerId(aServerId);
 

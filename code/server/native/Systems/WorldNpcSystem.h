@@ -52,6 +52,7 @@ private:
     flecs::entity m_host;
     std::unordered_map<uint64_t, Mirror> m_mirrors; // host local id -> mirror
     std::chrono::steady_clock::time_point m_lastHostBroadcast{};
+    std::chrono::steady_clock::time_point m_lastReport{}; // the host's last report - mirrors age by it
     std::chrono::steady_clock::time_point m_lastSwitchRead{};
     bool m_enabled{false};
     bool m_echo{false};

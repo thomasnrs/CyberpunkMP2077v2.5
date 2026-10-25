@@ -76,10 +76,15 @@ void WorldNpcSystem::Update(std::chrono::steady_clock::time_point aNow) noexcept
         BroadcastHost();
     }
 
+    // Measured against the host's report stream, not the wall clock: a host in a menu has
+    // paused their game - and their NPCs with it - and sends nothing. Timed by the wall
+    // clock, every mirror expired while they read the map and came back afterwards as a new
+    // entity somewhere else: the duplicates and the teleports. Only an NPC missing from
+    // reports that keep arriving has really gone.
     auto* pLevel = m_pWorld->get_mut<Level>();
     for (auto it = m_mirrors.begin(); it != m_mirrors.end();)
     {
-        if (aNow - it->second.LastSeen < kMirrorTimeout)
+        if (m_lastReport - it->second.LastSeen < kMirrorTimeout)
         {
             ++it;
             continue;
@@ -176,6 +181,7 @@ void WorldNpcSystem::HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& a
         return;
 
     const auto now = std::chrono::steady_clock::now();
+    m_lastReport = now;
 
     for (const auto& npc : aMessage.get_npcs())
     {

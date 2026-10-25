@@ -222,9 +222,11 @@ void Level::Remove(flecs::entity aEntity) noexcept
         }
     }
 
-    if (auto* pCellComponent = aEntity.get<CellComponent>(); pCellComponent)
+    if (auto* pCellComponent = aEntity.get<CellComponent>(); pCellComponent && pCellComponent->pCell)
     {
-        auto& pCell = pCellComponent->pCell;
+        // A copy, not a reference: Remove takes the CellComponent off the entity, which
+        // moves its storage - a reference read afterwards is whatever landed there next.
+        GridCell* pCell = pCellComponent->pCell;
 
         pCell->Remove(aEntity);
 

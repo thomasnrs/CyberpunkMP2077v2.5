@@ -312,6 +312,14 @@ bool VehicleSystem::HandleVehicleLoadMessage(const PacketEvent<server::NotifyVeh
 {
     spdlog::info("[VehicleSystem] HandleVehicleLoadMessage");
 
+    // See NetworkWorldSystem::IsUsableServerId.
+    if (!NetworkWorldSystem::IsUsableServerId(aMessage.get_id()))
+    {
+        spdlog::error("[VehicleDup] server vehicle {} would land on one of this world's own flecs ids - refused",
+                      aMessage.get_id());
+        return false;
+    }
+
     const auto worldSystem = Red::GetGameSystem<NetworkWorldSystem>();
     const auto& settings = Core::Container::Get<NetworkService>()->GetServerSettings();
     const auto cellSize = settings.get_cell_size();

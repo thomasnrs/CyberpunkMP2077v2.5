@@ -20,6 +20,10 @@ void GridCell::Add(flecs::entity aEntity) noexcept
 void GridCell::Remove(flecs::entity aEntity) noexcept
 {
     aEntity.remove<CellComponent>();
-    m_entities.erase(std::ranges::find(m_entities, aEntity));
+
+    // erase(end()) is undefined - it wrote past the vector - for an entity this cell does
+    // not hold.
+    if (const auto it = std::ranges::find(m_entities, aEntity); it != m_entities.end())
+        m_entities.erase(it);
 }
 

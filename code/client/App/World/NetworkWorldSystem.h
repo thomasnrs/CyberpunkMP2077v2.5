@@ -27,6 +27,13 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     bool Spawn(uint64_t aServerId, const Red::Vector4& aPosition, const Red::Quaternion& aRotation, const Red::DynArray<Red::TweakDBID>& aEquipment, const Vector<uint8_t> aCcstate, bool aIsMale, const std::string& acUsername = {}, const std::string& acRecord = {});
     void DeSpawn(uint64_t aServerId) const;
 
+    // Server ids become this world's flecs ids (make_alive), so one may only be used when it
+    // cannot land on an id the world keeps for itself: flecs' builtin entities below
+    // EcsFirstUserEntityId (384), and our own entities in 10M..20M (the constructor's
+    // entity range). The server once handed out 256 - flecs' own module entity - and the
+    // "replace the old puppet" path deleted it: the game went down on the next flecs call.
+    static bool IsUsableServerId(uint64_t aServerId);
+
     Red::Handle<Red::Entity> GetEntity(Red::EntityID aId) const;
     flecs::entity GetEntityByServerId(uint64_t aServerId) const;
     Red::EntityID GetEntityIdByServerId(uint64_t aServerId) const;

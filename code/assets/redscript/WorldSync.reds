@@ -27,9 +27,16 @@ public class MpWorldNpcService extends ScriptableService {
     public let mirrors: array<wref<NPCPuppet>>;
     public let hideTick: Int32;
 
-    // Every attachment slot there is (see MpSetHeldItemsHidden), read from TweakDB once.
+    // Every attachment slot there is (see MpHideHeldItems), read from TweakDB once, and the
+    // few that have ever held something - the only ones worth checking every frame.
     public let heldSlots: array<TweakDBID>;
     public let heldSlotsLoaded: Bool;
+    public let usedSlots: array<TweakDBID>;
+
+    // Who the last report carried, by id. The game swaps an NPC for a fresh object with the
+    // same id many times a fight; a flag on the object forgot, every time, that it was
+    // already being reported (see MpWorldNpcKeepRange).
+    public let reportedIds: array<Uint64>;
 
     private cb func OnLoad() {
         GameInstance.GetCallbackSystem().RegisterCallback(n"Entity/Attached", this, n"OnNpcAttached")
@@ -49,6 +56,15 @@ public class MpWorldNpcService extends ScriptableService {
                 ArrayPush(this.mirrors, npc);
             }
             return;
+        }
+
+        // The same object can attach again; one entry each, or it is reported twice.
+        let i = 0;
+        while i < ArraySize(this.npcs) {
+            if this.npcs[i] == npc {
+                return;
+            }
+            i += 1;
         }
 
         ArrayPush(this.npcs, npc);
@@ -138,10 +154,27 @@ public let m_mpPriorAttitude: EAIAttitude;
 
 public static func MpWorldSyncHideRange() -> Float = 70.0
 
+@addField(ScriptedPuppet)
+public let m_mpHideScans: Int32;
+
 public func MpUpdateGuestHiding(network: ref<NetworkWorldSystem>, service: ref<MpWorldNpcService>, player: ref<PlayerPuppet>) -> Void {
-    // Twice a second is plenty for something that changes as people walk.
     service.hideTick += 1;
-    if service.hideTick % 5 != 0 {
+
+    // Every frame: the hidden stay hidden. In a fight the game swaps an NPC for a fresh
+    // object with the same id several times a second, and the fresh one switches its meshes
+    // on as its appearance loads; checked a few times a second, each one showed for a moment
+    // - the ones that kept "coming back and vanishing".
+    let i = 0;
+    while i < ArraySize(service.npcs) {
+        let npc = service.npcs[i];
+        if IsDefined(npc) && npc.m_mpWorldSyncHidden {
+            MpKeepWorldSyncHidden(service, npc);
+        }
+        i += 1;
+    }
+
+    // Who should be hidden changes as people walk: six times a second is plenty.
+    if service.hideTick % 10 != 0 {
         return;
     }
 
@@ -196,8 +229,12 @@ public func MpSetWorldSyncHidden(service: ref<MpWorldNpcService>, npc: ref<NPCPu
     // (damage, other variants), and turning every one on dressed it in all of them.
     let held = 0;
     if hidden {
+        if first {
+            npc.m_mpHideScans = 0;
+        }
         MpHideWorldSyncMeshes(npc, npc, true);
-        held = MpHideHeldItems(service, npc);
+        // All 300-odd slots on arrival and once a second; the ones ever used in between.
+        held = MpHideHeldItems(service, npc, first || service.hideTick % 60 == 0);
     } else {
         let i = 0;
         while i < ArraySize(npc.m_mpHiddenComponents) {
@@ -239,6 +276,25 @@ public func MpSetWorldSyncHidden(service: ref<MpWorldNpcService>, npc: ref<NPCPu
 @addField(ScriptedPuppet)
 public let m_mpHiddenComponents: array<wref<IComponent>>;
 
+// The every-frame half of hiding: what was switched off and came back on goes off again, and
+// for its first second - while a fresh object is still assembling - everything is looked at.
+public func MpKeepWorldSyncHidden(service: ref<MpWorldNpcService>, npc: ref<NPCPuppet>) -> Void {
+    let i = 0;
+    while i < ArraySize(npc.m_mpHiddenComponents) {
+        let component = npc.m_mpHiddenComponents[i];
+        if IsDefined(component) && component.IsEnabled() {
+            component.Toggle(false);
+        }
+        i += 1;
+    }
+
+    if npc.m_mpHideScans < 60 {
+        npc.m_mpHideScans += 1;
+        MpHideWorldSyncMeshes(npc, npc, true);
+        MpHideHeldItems(service, npc, false);
+    }
+}
+
 public func MpHideWorldSyncMeshes(npc: ref<ScriptedPuppet>, entity: ref<Entity>, hitToo: Bool) -> Void {
     let components = entity.GetComponents();
     let i = 0;
@@ -260,10 +316,11 @@ public func MpHideWorldSyncMeshes(npc: ref<ScriptedPuppet>, entity: ref<Entity>,
  *
  * What an NPC holds (a gun, a phone, a guitar from its workspot) is an entity of its own,
  * attached to one of the NPC's slots: switching the NPC's meshes off left it hanging in the
- * air. Every slot is looked at, since workspot props use slots weapons never do. Returns how
- * many items were found.
+ * air. Every slot is looked at (allSlots), since workspot props use slots weapons never do;
+ * the ones found holding something are remembered and checked on their own in between.
+ * Returns how many items were found.
  */
-public func MpHideHeldItems(service: ref<MpWorldNpcService>, npc: ref<NPCPuppet>) -> Int32 {
+public func MpHideHeldItems(service: ref<MpWorldNpcService>, npc: ref<NPCPuppet>, allSlots: Bool) -> Int32 {
     if !service.heldSlotsLoaded {
         service.heldSlotsLoaded = true;
         let records = TweakDBInterface.GetRecords(n"AttachmentSlot");
@@ -282,17 +339,25 @@ public func MpHideHeldItems(service: ref<MpWorldNpcService>, npc: ref<NPCPuppet>
         if !ArrayContains(service.heldSlots, t"AttachmentSlots.WeaponLeft") {
             ArrayPush(service.heldSlots, t"AttachmentSlots.WeaponLeft");
         }
+        ArrayPush(service.usedSlots, t"AttachmentSlots.WeaponRight");
+        ArrayPush(service.usedSlots, t"AttachmentSlots.WeaponLeft");
         MpFTLog(s"[WorldNpc] \(ArraySize(records)) attachment slots in TweakDB, \(ArraySize(service.heldSlots)) checked on hidden NPCs");
     }
 
     let transactions = GameInstance.GetTransactionSystem(npc.GetGame());
     let found = 0;
     let i = 0;
-    while i < ArraySize(service.heldSlots) {
-        let item = transactions.GetItemInSlot(npc, service.heldSlots[i]);
+    let count = allSlots ? ArraySize(service.heldSlots) : ArraySize(service.usedSlots);
+    while i < count {
+        let slot = allSlots ? service.heldSlots[i] : service.usedSlots[i];
+        let item = transactions.GetItemInSlot(npc, slot);
         if IsDefined(item) {
             MpHideWorldSyncMeshes(npc, item, false);
             found += 1;
+            if allSlots && !ArrayContains(service.usedSlots, slot) {
+                ArrayPush(service.usedSlots, slot);
+                MpFTLog(s"[WorldNpc] slot \(TDBID.ToStringDEBUG(slot)) holds things - checked every frame from now on");
+            }
         }
         i += 1;
     }
@@ -350,7 +415,9 @@ public static func MpWorldNpcKeepRange() -> Float = 85.0
 
 @addField(ScriptedPuppet)
 public let m_mpWorldReported: Bool;
-public static func MpWorldNpcMaxPerReport() -> Int32 = 40
+// A gang fight fills 60 m with more than 40: the rest went unreported, their mirrors expired
+// and came back as new ones.
+public static func MpWorldNpcMaxPerReport() -> Int32 = 64
 
 public class MpWorldNpcReportPoll extends DelayCallback {
     public let owner: wref<PlayerPuppet>;
@@ -363,12 +430,13 @@ public class MpWorldNpcReportPoll extends DelayCallback {
 
         MpReportWorldNpcs(this.owner);
 
-        // 30/s, the rate players send at. At 10/s the mirrors' interpolation - built for
-        // 30/s - ran dry on ~22% of frames and guessed, then jumped when the truth arrived.
+        // 60/s, the rate players send at (server.json UpdateRate). At 10/s the mirrors'
+        // interpolation ran dry on ~22% of frames and guessed, then jumped when the truth
+        // arrived. Every frame, at 60 fps or less.
         let again = new MpWorldNpcReportPoll();
         again.owner = this.owner;
         again.token = this.token;
-        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.033, false);
+        GameInstance.GetDelaySystem(GetGameInstance()).DelayCallback(again, 0.016, false);
     }
 }
 
@@ -400,12 +468,17 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
     let keptNpcs: array<wref<NPCPuppet>>;
     let keptPositions: array<Vector4>;
     let keptTimes: array<Float>;
+    let reportedIds: array<Uint64>;
     let reported = 0;
 
     let i = 0;
     while i < ArraySize(service.npcs) {
         let npc = service.npcs[i];
         if IsDefined(npc) && npc.IsAttached() {
+            let localId = Cast<Uint64>(EntityID.GetHash(npc.GetEntityID()));
+            if npc.m_mpWorldReported || ArrayContains(service.reportedIds, localId) {
+                npc.m_mpWorldReported = true;
+            }
             let position = npc.GetWorldPosition();
             let lastTime = service.lastTimes[i];
             let speed = 0.0;
@@ -420,13 +493,16 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
             let inRange = distance <= range || (npc.m_mpWorldReported && distance <= MpWorldNpcKeepRange());
             npc.m_mpWorldReported = inRange && !npc.IsCrowd();
 
-            if !npc.IsCrowd() && reported < MpWorldNpcMaxPerReport() && inRange {
+            // Once per id: an old object not yet detached and its fresh replacement are the
+            // same NPC.
+            if !npc.IsCrowd() && reported < MpWorldNpcMaxPerReport() && inRange && !ArrayContains(reportedIds, localId) {
+                ArrayPush(reportedIds, localId);
                 let shots = MpTrackWorldNpcWeapon(npc);
 
                 // Yaw 0 looks down +Y; forward at yaw a is (-sin a, cos a).
                 let forward = npc.GetWorldForward();
                 network.ReportWorldNpc(
-                    Cast<Uint64>(EntityID.GetHash(npc.GetEntityID())),
+                    localId,
                     TDBID.ToNumber(npc.GetRecordID()),
                     position,
                     AtanF(-forward.X, forward.Y),
@@ -447,6 +523,7 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
     service.npcs = keptNpcs;
     service.lastPositions = keptPositions;
     service.lastTimes = keptTimes;
+    service.reportedIds = reportedIds;
 
     network.FlushWorldNpcReport();
 }
