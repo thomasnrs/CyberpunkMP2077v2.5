@@ -2452,7 +2452,7 @@ uint64_t NetworkWorldSystem::ConsumeWorldNpcDamage()
 }
 
 void NetworkWorldSystem::ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw,
-                                        float aSpeed, uint32_t aLifeState)
+                                        float aSpeed, uint32_t aLifeState, uint64_t aWeapon, uint32_t aShots)
 {
     client::WorldNpcState state;
     state.set_local_id(aLocalId);
@@ -2467,6 +2467,8 @@ void NetworkWorldSystem::ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, con
     state.set_rotation(aYaw);
     state.set_speed(aSpeed);
     state.set_life_state(aLifeState);
+    state.set_weapon(aWeapon);
+    state.set_shots(aShots);
 
     m_pendingWorldNpcs.push_back(state);
 }

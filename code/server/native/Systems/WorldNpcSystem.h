@@ -41,7 +41,12 @@ private:
         flecs::entity Entity;
         std::chrono::steady_clock::time_point LastSeen;
         uint32_t LifeState{0};
+        uint64_t Weapon{0};
+        std::chrono::steady_clock::time_point WeaponSent{};
     };
+
+    // Weapon events for a mirror go to everyone the mirror itself goes to.
+    void SendMirrorWeaponEvent(flecs::entity aMirror, uint32_t aKind, uint64_t aWeapon) noexcept;
 
     World* m_pWorld;
     flecs::entity m_host;

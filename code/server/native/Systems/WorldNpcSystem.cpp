@@ -134,6 +134,23 @@ void WorldNpcSystem::BroadcastHost() noexcept
         });
 }
 
+void WorldNpcSystem::SendMirrorWeaponEvent(flecs::entity aMirror, uint32_t aKind, uint64_t aWeapon) noexcept
+{
+    server::NotifyWeaponEvent event;
+    event.set_id(aMirror);
+    event.set_kind(aKind);
+    event.set_weapon_id(aWeapon);
+
+    const auto host = m_echo ? flecs::entity{} : m_host;
+    m_pWorld->each(
+        [&event, host](flecs::entity aPlayer, const PlayerComponent& aPlayerComponent)
+        {
+            if (host && aPlayer == host)
+                return;
+            GServer->Send(aPlayerComponent.Connection, event);
+        });
+}
+
 void WorldNpcSystem::ClearMirrors() noexcept
 {
     auto* pLevel = m_pWorld->get_mut<Level>();
@@ -211,6 +228,22 @@ void WorldNpcSystem::HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& a
             movement.Tick = aMessage.get_tick();
             ++movement.Sequence;
             mirror.Entity.set<MovementComponent>(movement);
+        }
+
+        // Its weapon and shots, through the same events players' weapons use - so a mirror
+        // draws, raises and fires exactly like a remote player does on every screen. The
+        // equip is repeated every few seconds for players who arrive late.
+        if (npc.get_weapon() != mirror.Weapon || (mirror.Weapon != 0 && now - mirror.WeaponSent >= std::chrono::seconds(3)))
+        {
+            mirror.Weapon = npc.get_weapon();
+            mirror.WeaponSent = now;
+            SendMirrorWeaponEvent(mirror.Entity, mirror.Weapon != 0 ? 0u : 1u, mirror.Weapon);
+        }
+
+        if (mirror.Weapon != 0 && npc.get_life_state() == 0)
+        {
+            for (uint32_t shot = 0; shot < std::min(npc.get_shots(), 3u); ++shot)
+                SendMirrorWeaponEvent(mirror.Entity, 2u, mirror.Weapon);
         }
 
         // Dead on the host, dead for everyone: the same downed/dead drawing players get.

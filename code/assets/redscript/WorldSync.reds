@@ -27,6 +27,10 @@ public class MpWorldNpcService extends ScriptableService {
     public let mirrors: array<wref<NPCPuppet>>;
     public let hideTick: Int32;
 
+    // Every attachment slot there is (see MpSetHeldItemsHidden), read from TweakDB once.
+    public let heldSlots: array<TweakDBID>;
+    public let heldSlotsLoaded: Bool;
+
     private cb func OnLoad() {
         GameInstance.GetCallbackSystem().RegisterCallback(n"Entity/Attached", this, n"OnNpcAttached")
             .AddTarget(EntityTarget.Type(n"NPCPuppet"));
@@ -57,7 +61,7 @@ public class MpWorldNpcService extends ScriptableService {
         if this.IsNearMirror(npc.GetWorldPosition()) {
             let player = GetPlayer(npc.GetGame());
             if IsDefined(player) && !npc.IsCrowd() {
-                MpSetWorldSyncHidden(npc, player, true);
+                MpSetWorldSyncHidden(this, npc, player, true);
             }
         }
     }
@@ -172,51 +176,173 @@ public func MpUpdateGuestHiding(network: ref<NetworkWorldSystem>, service: ref<M
             }
 
             if near {
-                MpSetWorldSyncHidden(npc, player, true);
+                MpSetWorldSyncHidden(service, npc, player, true);
             } else if npc.m_mpWorldSyncHidden {
-                MpSetWorldSyncHidden(npc, player, false);
+                MpSetWorldSyncHidden(service, npc, player, false);
             }
         }
         i += 1;
     }
 }
 
-public func MpSetWorldSyncHidden(npc: ref<NPCPuppet>, player: ref<PlayerPuppet>, hidden: Bool) -> Void {
+@addField(ScriptedPuppet)
+public let m_mpAttitudeChanged: Bool;
+
+public func MpSetWorldSyncHidden(service: ref<MpWorldNpcService>, npc: ref<NPCPuppet>, player: ref<PlayerPuppet>, hidden: Bool) -> Void {
     let first = (hidden && !npc.m_mpWorldSyncHidden) || (!hidden && npc.m_mpWorldSyncHidden);
 
     // Re-applied while hidden, not only on the edge: appearance work switches meshes back on.
-    let components = npc.GetComponents();
-    let i = 0;
-    while i < ArraySize(components) {
-        if IsDefined(components[i]) {
-            let name = NameToString(components[i].GetClassName());
-            if StrContains(name, "Mesh") || Equals(name, "gameHitRepresentationComponent") {
-                let enabled = components[i].IsEnabled();
-                if (hidden && enabled) || (!hidden && !enabled) {
-                    components[i].Toggle(!hidden);
-                }
+    // Back on are only the ones switched off here - an NPC carries meshes the game keeps off
+    // (damage, other variants), and turning every one on dressed it in all of them.
+    let held = 0;
+    if hidden {
+        MpHideWorldSyncMeshes(npc, npc, true);
+        held = MpHideHeldItems(service, npc);
+    } else {
+        let i = 0;
+        while i < ArraySize(npc.m_mpHiddenComponents) {
+            let component = npc.m_mpHiddenComponents[i];
+            if IsDefined(component) && !component.IsEnabled() {
+                component.Toggle(true);
             }
+            i += 1;
         }
-        i += 1;
+        ArrayClear(npc.m_mpHiddenComponents);
     }
 
     if !first {
         return;
     }
 
+    // The host's own NPCs (hidden only when echo shows it its mirrors) ARE the simulation
+    // everybody sees: made friendly, they stopped fighting the host, and the mirrors had
+    // nothing to copy. Only a guest's duplicates are pacified.
+    let network = GameInstance.GetNetworkWorldSystem();
+    let isHost = IsDefined(network) && network.IsWorldHost();
     let theirs = npc.GetAttitudeAgent();
     let mine = player.GetAttitudeAgent();
     if IsDefined(theirs) && IsDefined(mine) {
-        if hidden {
+        if hidden && !isHost {
             npc.m_mpPriorAttitude = theirs.GetAttitudeTowards(mine);
             theirs.SetAttitudeTowards(mine, EAIAttitude.AIA_Friendly);
-        } else {
+            npc.m_mpAttitudeChanged = true;
+        } else if !hidden && npc.m_mpAttitudeChanged {
             theirs.SetAttitudeTowards(mine, npc.m_mpPriorAttitude);
+            npc.m_mpAttitudeChanged = false;
         }
     }
 
     npc.m_mpWorldSyncHidden = hidden;
-    MpFTLog(s"[WorldNpc] own NPC \(EntityID.GetHash(npc.GetEntityID())) \(hidden ? "hidden - the host's copy stands in" : "back - no host copy near")");
+    MpFTLog(s"[WorldNpc] own NPC \(EntityID.GetHash(npc.GetEntityID())) \(hidden ? "hidden - the host's copy stands in" : "back - no host copy near") (\(held) held items)");
+}
+
+@addField(ScriptedPuppet)
+public let m_mpHiddenComponents: array<wref<IComponent>>;
+
+public func MpHideWorldSyncMeshes(npc: ref<ScriptedPuppet>, entity: ref<Entity>, hitToo: Bool) -> Void {
+    let components = entity.GetComponents();
+    let i = 0;
+    while i < ArraySize(components) {
+        let component = components[i];
+        if IsDefined(component) && component.IsEnabled() {
+            let name = NameToString(component.GetClassName());
+            if StrContains(name, "Mesh") || (hitToo && Equals(name, "gameHitRepresentationComponent")) {
+                component.Toggle(false);
+                ArrayPush(npc.m_mpHiddenComponents, component);
+            }
+        }
+        i += 1;
+    }
+}
+
+/**
+ * Hidden NPCs and the things in their hands - the floating guitar.
+ *
+ * What an NPC holds (a gun, a phone, a guitar from its workspot) is an entity of its own,
+ * attached to one of the NPC's slots: switching the NPC's meshes off left it hanging in the
+ * air. Every slot is looked at, since workspot props use slots weapons never do. Returns how
+ * many items were found.
+ */
+public func MpHideHeldItems(service: ref<MpWorldNpcService>, npc: ref<NPCPuppet>) -> Int32 {
+    if !service.heldSlotsLoaded {
+        service.heldSlotsLoaded = true;
+        let records = TweakDBInterface.GetRecords(n"AttachmentSlot");
+        if ArraySize(records) == 0 {
+            records = TweakDBInterface.GetRecords(n"gamedataAttachmentSlot_Record");
+        }
+        let r = 0;
+        while r < ArraySize(records) {
+            ArrayPush(service.heldSlots, records[r].GetID());
+            r += 1;
+        }
+        // The two everyone uses, whatever TweakDB said.
+        if !ArrayContains(service.heldSlots, t"AttachmentSlots.WeaponRight") {
+            ArrayPush(service.heldSlots, t"AttachmentSlots.WeaponRight");
+        }
+        if !ArrayContains(service.heldSlots, t"AttachmentSlots.WeaponLeft") {
+            ArrayPush(service.heldSlots, t"AttachmentSlots.WeaponLeft");
+        }
+        MpFTLog(s"[WorldNpc] \(ArraySize(records)) attachment slots in TweakDB, \(ArraySize(service.heldSlots)) checked on hidden NPCs");
+    }
+
+    let transactions = GameInstance.GetTransactionSystem(npc.GetGame());
+    let found = 0;
+    let i = 0;
+    while i < ArraySize(service.heldSlots) {
+        let item = transactions.GetItemInSlot(npc, service.heldSlots[i]);
+        if IsDefined(item) {
+            MpHideWorldSyncMeshes(npc, item, false);
+            found += 1;
+        }
+        i += 1;
+    }
+    return found;
+}
+
+/**
+ * The weapon in an NPC's hand and the rounds it fired since the last report, for the mirrors
+ * to draw and fire the same way (WorldNpcSystem relays them as players' weapon events). A
+ * magazine that dropped is shots; one that rose is a reload; a new weapon starts the count over.
+ */
+@addField(ScriptedPuppet)
+public let m_mpWorldWeapon: Uint64;
+
+@addField(ScriptedPuppet)
+public let m_mpWorldAmmo: Int32;
+
+@addField(ScriptedPuppet)
+public let m_mpWorldAmmoKnown: Bool;
+
+@addField(ScriptedPuppet)
+public let m_mpWorldShotsLogged: Int32;
+
+public func MpTrackWorldNpcWeapon(npc: ref<NPCPuppet>) -> Uint32 {
+    let weapon = GameObject.GetActiveWeapon(npc);
+    let record = 0ul;
+    if IsDefined(weapon) && IsDefined(weapon.GetWeaponRecord()) {
+        record = TDBID.ToNumber(weapon.GetWeaponRecord().GetID());
+    }
+
+    if NotEquals(record, npc.m_mpWorldWeapon) {
+        npc.m_mpWorldAmmoKnown = false;
+        MpFTLog(s"[WorldNpc] own NPC \(EntityID.GetHash(npc.GetEntityID())) \(Equals(record, 0ul) ? "holstered" : s"drew \(record)")");
+    }
+    npc.m_mpWorldWeapon = record;
+
+    let shots = 0u;
+    if NotEquals(record, 0ul) {
+        let ammo = Cast<Int32>(WeaponObject.GetMagazineAmmoCount(weapon));
+        if npc.m_mpWorldAmmoKnown && ammo < npc.m_mpWorldAmmo {
+            shots = Cast<Uint32>(npc.m_mpWorldAmmo - ammo);
+            if npc.m_mpWorldShotsLogged < 5 {
+                npc.m_mpWorldShotsLogged += 1;
+                MpFTLog(s"[WorldNpc] own NPC \(EntityID.GetHash(npc.GetEntityID())) fired \(shots) (magazine \(ammo))");
+            }
+        }
+        npc.m_mpWorldAmmo = ammo;
+        npc.m_mpWorldAmmoKnown = true;
+    }
+    return shots;
 }
 
 public static func MpWorldNpcRange() -> Float = 60.0
@@ -295,6 +421,8 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
             npc.m_mpWorldReported = inRange && !npc.IsCrowd();
 
             if !npc.IsCrowd() && reported < MpWorldNpcMaxPerReport() && inRange {
+                let shots = MpTrackWorldNpcWeapon(npc);
+
                 // Yaw 0 looks down +Y; forward at yaw a is (-sin a, cos a).
                 let forward = npc.GetWorldForward();
                 network.ReportWorldNpc(
@@ -303,7 +431,9 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
                     position,
                     AtanF(-forward.X, forward.Y),
                     speed,
-                    npc.IsDead() ? 2u : 0u);
+                    npc.IsDead() ? 2u : 0u,
+                    npc.m_mpWorldWeapon,
+                    shots);
                 reported += 1;
             }
 

@@ -435,7 +435,7 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     // one ReportWorldNpc per NPC near us, then FlushWorldNpcReport sends them together.
     bool IsWorldHost() const { return m_isWorldHost; }
     void ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw, float aSpeed,
-                        uint32_t aLifeState);
+                        uint32_t aLifeState, uint64_t aWeapon, uint32_t aShots);
     void FlushWorldNpcReport();
     // Hits on mirrors of our NPCs, forwarded by the server while we are host: the next
     // NPC's local id (0 when none), its damage left for GetConsumedWorldNpcDamage.

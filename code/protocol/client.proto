@@ -538,6 +538,10 @@ message WorldNpcState {
     float speed = 5;
     // 0 alive, 2 dead.
     uint32 life_state = 6;
+    // TweakDBID of the weapon in its hands, 0 when none.
+    uint64 weapon = 7;
+    // Shots fired since the previous report (its magazine went down by this much).
+    uint32 shots = 8;
 }
 
 message WorldNpcReport {
