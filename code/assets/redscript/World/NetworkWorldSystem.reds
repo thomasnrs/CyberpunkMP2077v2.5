@@ -314,6 +314,16 @@ public native class NetworkWorldSystem extends IGameSystem {
     // World sync, host model - see WorldSync.reds.
     public native func IsWorldHost() -> Bool;
     public native func ReportWorldNpc(localId: Uint64, record: Uint64, position: Vector4, yaw: Float, speed: Float, lifeState: Uint32, weapon: Uint64, shots: Uint32) -> Void;
+    public native func SendNpcLink(localId: Uint64, record: Uint64, position: Vector4, spawn: Vector4, damagePct: Float, killed: Bool, defeated: Bool) -> Void;
+    public native func ConsumeNpcLink() -> Bool;
+    public native func GetNpcLinkSource() -> Uint64;
+    public native func GetNpcLinkLocalId() -> Uint64;
+    public native func GetNpcLinkRecord() -> Uint64;
+    public native func GetNpcLinkPosition() -> Vector4;
+    public native func GetNpcLinkSpawn() -> Vector4;
+    public native func GetNpcLinkDamage() -> Float;
+    public native func GetNpcLinkKilled() -> Bool;
+    public native func GetNpcLinkDefeated() -> Bool;
     public native func FlushWorldNpcReport() -> Void;
     public native func ConsumeWorldNpcDamage() -> Uint64;
     public native func GetConsumedWorldNpcDamage() -> Float;

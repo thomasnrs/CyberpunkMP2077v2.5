@@ -449,6 +449,22 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     uint64_t ConsumeWorldNpcDamage();
     float GetConsumedWorldNpcDamage() const { return m_consumedWorldNpcDamage; }
 
+    // Shared NPC combat (NpcLinkEvent). What we did to one of OUR NPCs goes out for every
+    // other game to apply to its own NPC of the same record near the same spot; theirs come
+    // in through ConsumeNpcLink - true while one is waiting, its fields left for the getters
+    // until the next call.
+    void SendNpcLink(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, const Red::Vector4& aSpawn,
+                     float aDamagePct, bool aKilled, bool aDefeated);
+    bool ConsumeNpcLink();
+    uint64_t GetNpcLinkSource() const { return m_npcLink.Source; }
+    uint64_t GetNpcLinkLocalId() const { return m_npcLink.LocalId; }
+    uint64_t GetNpcLinkRecord() const { return m_npcLink.Record; }
+    Red::Vector4 GetNpcLinkPosition() const { return m_npcLink.Position; }
+    Red::Vector4 GetNpcLinkSpawn() const { return m_npcLink.Spawn; }
+    float GetNpcLinkDamage() const { return m_npcLink.Damage; }
+    bool GetNpcLinkKilled() const { return m_npcLink.Killed; }
+    bool GetNpcLinkDefeated() const { return m_npcLink.Defeated; }
+
     // Life-state changes of OTHER combatants, for drawing them down or back up. Returns the
     // server id of the next one waiting (0 when none) and leaves its new state for
     // GetConsumedLifeState. See MpApplyRemoteLifeStates in Combat.reds.
@@ -542,6 +558,7 @@ protected:
     void HandleWeaponEvent(const PacketEvent<server::NotifyWeaponEvent>& aMessage);
     void HandleWorldHost(const PacketEvent<server::NotifyWorldHost>& aMessage);
     void HandleWorldNpcDamage(const PacketEvent<server::NotifyWorldNpcDamage>& aMessage);
+    void HandleNpcLink(const PacketEvent<server::NotifyNpcLinkEvent>& aMessage);
 
     // Somebody is being quickhacked. Rendered with the game's own BeingHacked state.
     void HandleQuickhackUpload(const PacketEvent<server::NotifyQuickhackUpload>& aMessage);
@@ -898,6 +915,19 @@ private:
     Vector<client::WorldNpcState> m_pendingWorldNpcs;
     Vector<std::pair<uint64_t, float>> m_worldNpcDamage;
     float m_consumedWorldNpcDamage{0.f};
+    struct NpcLink
+    {
+        uint64_t Source{0};
+        uint64_t LocalId{0};
+        uint64_t Record{0};
+        Red::Vector4 Position{0.f, 0.f, 0.f, 0.f};
+        Red::Vector4 Spawn{0.f, 0.f, 0.f, 0.f};
+        float Damage{0.f};
+        bool Killed{false};
+        bool Defeated{false};
+    };
+    Vector<NpcLink> m_npcLinks;
+    NpcLink m_npcLink;
     void NoteRemoteLifeState(uint64_t aServerId, uint32_t aState);
     std::unordered_map<uint64_t, uint32_t> m_remoteLifeStates;
     Vector<std::pair<uint64_t, uint32_t>> m_remoteLifeChanges;
@@ -1082,6 +1112,16 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(FlushWorldNpcReport);
     RTTI_METHOD(ConsumeWorldNpcDamage);
     RTTI_METHOD(GetConsumedWorldNpcDamage);
+    RTTI_METHOD(SendNpcLink);
+    RTTI_METHOD(ConsumeNpcLink);
+    RTTI_METHOD(GetNpcLinkSource);
+    RTTI_METHOD(GetNpcLinkLocalId);
+    RTTI_METHOD(GetNpcLinkRecord);
+    RTTI_METHOD(GetNpcLinkPosition);
+    RTTI_METHOD(GetNpcLinkSpawn);
+    RTTI_METHOD(GetNpcLinkDamage);
+    RTTI_METHOD(GetNpcLinkKilled);
+    RTTI_METHOD(GetNpcLinkDefeated);
     RTTI_METHOD(ConsumeRemoteLifeChange);
     RTTI_METHOD(GetConsumedLifeState);
     RTTI_METHOD(GetRemoteLifeState);

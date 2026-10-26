@@ -29,6 +29,7 @@ struct WorldNpcSystem
 
 protected:
     void HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& aMessage) noexcept;
+    void HandleNpcLinkEvent(PacketEvent<client::NpcLinkEvent>& aMessage) noexcept;
 
 private:
     void ReadSwitches() noexcept;
@@ -56,4 +57,7 @@ private:
     std::chrono::steady_clock::time_point m_lastSwitchRead{};
     bool m_enabled{false};
     bool m_echo{false};
+    bool m_linkEnabled{true};
+    bool m_linkEcho{false};
+    bool m_switchesRead{false};
 };

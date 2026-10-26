@@ -38,6 +38,18 @@ public class MpWorldNpcService extends ScriptableService {
     // already being reported (see MpWorldNpcKeepRange).
     public let reportedIds: array<Uint64>;
 
+    // Shared NPC combat (NpcLink.reds): every NPC's first-seen position by id, and the
+    // pairings of other players' NPCs with ours.
+    public let spawnIds: array<Uint64>;
+    public let spawnPositions: array<Vector4>;
+    public let linkSources: array<Uint64>;
+    public let linkRemoteIds: array<Uint64>;
+    public let linkNpcs: array<wref<NPCPuppet>>;
+    public let linkTick: Int32;
+    public let linkMisses: Int32;
+    public let linkHitsLogged: Int32;
+    public let pruneTick: Int32;
+
     private cb func OnLoad() {
         GameInstance.GetCallbackSystem().RegisterCallback(n"Entity/Attached", this, n"OnNpcAttached")
             .AddTarget(EntityTarget.Type(n"NPCPuppet"));
@@ -57,6 +69,8 @@ public class MpWorldNpcService extends ScriptableService {
             }
             return;
         }
+
+        MpNoteNpcSpawn(this, npc);
 
         // The same object can attach again; one entry each, or it is reported twice.
         let i = 0;
@@ -440,6 +454,27 @@ public class MpWorldNpcReportPoll extends DelayCallback {
     }
 }
 
+public func MpPruneWorldNpcs(service: ref<MpWorldNpcService>) -> Void {
+    let keptNpcs: array<wref<NPCPuppet>>;
+    let keptPositions: array<Vector4>;
+    let keptTimes: array<Float>;
+
+    let i = 0;
+    while i < ArraySize(service.npcs) {
+        let npc = service.npcs[i];
+        if IsDefined(npc) && npc.IsAttached() {
+            ArrayPush(keptNpcs, npc);
+            ArrayPush(keptPositions, service.lastPositions[i]);
+            ArrayPush(keptTimes, service.lastTimes[i]);
+        }
+        i += 1;
+    }
+
+    service.npcs = keptNpcs;
+    service.lastPositions = keptPositions;
+    service.lastTimes = keptTimes;
+}
+
 public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
     let network = GameInstance.GetNetworkWorldSystem();
     if !IsDefined(network) || !IsDefined(player) {
@@ -454,7 +489,16 @@ public func MpReportWorldNpcs(player: ref<PlayerPuppet>) -> Void {
     // Host or guest: give way to the host's NPCs wherever their mirrors stand.
     MpUpdateGuestHiding(network, service, player);
 
+    // Everybody: hits and deaths shared with the other games' copies of our NPCs.
+    MpUpdateNpcLinks(network, service, player);
+
     if !network.IsConnected() || !network.IsWorldHost() {
+        // The host's report below rebuilds the list as it goes; nobody else's would ever let
+        // go of an NPC that streamed out, and every loop over it would only grow.
+        service.pruneTick += 1;
+        if service.pruneTick % 120 == 0 {
+            MpPruneWorldNpcs(service);
+        }
         return;
     }
 

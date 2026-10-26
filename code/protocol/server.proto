@@ -301,6 +301,19 @@ message NotifyWorldNpcDamage {
     float damage = 2;
 }
 
+// Another player's NpcLinkEvent, for this game to apply to its own matching NPC.
+message NotifyNpcLinkEvent {
+    // The sender's player entity: their local ids are only unique per sender.
+    uint64 source = 1;
+    uint64 local_id = 2;
+    uint64 record = 3;
+    common.Vector3 position = 4;
+    common.Vector3 spawn = 5;
+    float damage_pct = 6;
+    bool killed = 7;
+    bool defeated = 8;
+}
+
 message NotifyVehicleLoad {
     uint64 id = 1;
     common.Vector3 position = 2;
@@ -768,5 +781,6 @@ message Protocol {
         NotifyCall notify_call = 33;
         NotifyWorldHost notify_world_host = 34;
         NotifyWorldNpcDamage notify_world_npc_damage = 35;
+        NotifyNpcLinkEvent notify_npc_link_event = 36;
     }
 }

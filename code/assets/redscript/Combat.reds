@@ -100,6 +100,8 @@ public func MpReportHit(target: ref<ScriptedPuppet>, evt: ref<gameHitEvent>) -> 
         let me = GetPlayer(GetGameInstance());
         if IsDefined(me) && !target.HasTag(n"CyberpunkMP.Puppet") {
             MpNoteNpcIdentity(me, target);
+            // One of this game's own NPCs: our hit is shared with the other games' copy of it.
+            MpShareNpcHit(target as NPCPuppet, evt);
         }
 
         if target.HasTag(n"CyberpunkMP.Puppet") {

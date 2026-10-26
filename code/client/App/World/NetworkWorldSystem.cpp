@@ -2471,6 +2471,61 @@ uint64_t NetworkWorldSystem::ConsumeWorldNpcDamage()
     return id;
 }
 
+void NetworkWorldSystem::SendNpcLink(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition,
+                                     const Red::Vector4& aSpawn, float aDamagePct, bool aKilled, bool aDefeated)
+{
+    const auto service = Core::Container::Get<NetworkService>();
+    if (!service || !service->IsConnected())
+        return;
+
+    const auto toVector = [](const Red::Vector4& aValue)
+    {
+        common::Vector3 vector;
+        vector.set_x(aValue.X);
+        vector.set_y(aValue.Y);
+        vector.set_z(aValue.Z);
+        return vector;
+    };
+
+    client::NpcLinkEvent event;
+    event.set_local_id(aLocalId);
+    event.set_record(aRecord);
+    event.set_position(toVector(aPosition));
+    event.set_spawn(toVector(aSpawn));
+    event.set_damage_pct(aDamagePct);
+    event.set_killed(aKilled);
+    event.set_defeated(aDefeated);
+    service->Send(event);
+}
+
+void NetworkWorldSystem::HandleNpcLink(const PacketEvent<server::NotifyNpcLinkEvent>& aMessage)
+{
+    // Applied by script (NpcLink.reds), which holds the NPCs.
+    const auto toVector = [](const common::Vector3& aValue)
+    { return Red::Vector4{aValue.get_x(), aValue.get_y(), aValue.get_z(), 1.f}; };
+
+    NpcLink link;
+    link.Source = aMessage.get_source();
+    link.LocalId = aMessage.get_local_id();
+    link.Record = aMessage.get_record();
+    link.Position = toVector(aMessage.get_position());
+    link.Spawn = toVector(aMessage.get_spawn());
+    link.Damage = aMessage.get_damage_pct();
+    link.Killed = aMessage.get_killed();
+    link.Defeated = aMessage.get_defeated();
+    m_npcLinks.push_back(link);
+}
+
+bool NetworkWorldSystem::ConsumeNpcLink()
+{
+    if (m_npcLinks.empty())
+        return false;
+
+    m_npcLink = m_npcLinks.front();
+    m_npcLinks.erase(m_npcLinks.begin());
+    return true;
+}
+
 void NetworkWorldSystem::ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw,
                                         float aSpeed, uint32_t aLifeState, uint64_t aWeapon, uint32_t aShots)
 {
@@ -4022,6 +4077,7 @@ void NetworkWorldSystem::OnInitialize(const RED4ext::JobHandle& aJob)
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWeaponEvent>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWorldHost>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleWorldNpcDamage>(this);
+    pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleNpcLink>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleQuickhackUpload>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleVehicleControlAssigned>(this);
     pNetworkService->RegisterHandler<&NetworkWorldSystem::HandleCharacterList>(this);

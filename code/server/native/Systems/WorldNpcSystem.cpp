@@ -27,12 +27,17 @@ constexpr auto kHostBroadcastInterval = std::chrono::seconds(5);
 // Far more than any area a host reports, and few enough that a misbehaving client cannot
 // make the server allocate without bound.
 constexpr size_t kMaxMirrors = 256;
+
+// Shared NPC combat reaches the games that can have that NPC spawned - a little past the
+// distance a game keeps NPCs around its player.
+constexpr float kNpcLinkRange = 250.f;
 }
 
 WorldNpcSystem::WorldNpcSystem(gsl::not_null<World*> apWorld)
     : m_pWorld(apWorld)
 {
     GServer->RegisterHandler<&WorldNpcSystem::HandleWorldNpcReport>(this);
+    GServer->RegisterHandler<&WorldNpcSystem::HandleNpcLinkEvent>(this);
 }
 
 // Off unless config/worldnpc.on exists - checked every few seconds, so it can be switched
@@ -43,6 +48,18 @@ void WorldNpcSystem::ReadSwitches() noexcept
     std::error_code ec;
     const bool enabled = std::filesystem::exists(GetPath() / "config" / "worldnpc.on", ec);
     const bool echo = std::filesystem::exists(GetPath() / "config" / "npcmirror.echo", ec);
+
+    // Shared NPC combat is ON unless config/npclink.off exists; config/npclink.echo also
+    // sends a player's own events back to them, for one person to watch the path work (their
+    // NPCs then take every hit twice).
+    const bool linkEnabled = !std::filesystem::exists(GetPath() / "config" / "npclink.off", ec);
+    const bool linkEcho = std::filesystem::exists(GetPath() / "config" / "npclink.echo", ec);
+    if (linkEnabled != m_linkEnabled || linkEcho != m_linkEcho || !m_switchesRead)
+        spdlog::warn("[NpcLink] shared NPC combat {}{}", linkEnabled ? "ON" : "OFF (config/npclink.off)",
+                     linkEcho ? ", echoed to the sender (config/npclink.echo)" : "");
+    m_linkEnabled = linkEnabled;
+    m_linkEcho = linkEcho;
+    m_switchesRead = true;
 
     if (enabled != m_enabled)
         spdlog::warn("[WorldNpc] world NPC sync {}", enabled ? "ON (config/worldnpc.on)" : "OFF");
@@ -165,6 +182,66 @@ void WorldNpcSystem::ClearMirrors() noexcept
             pLevel->Remove(mirror.Entity);
     }
     m_mirrors.clear();
+}
+
+/**
+ * Shared NPC combat: every game keeps simulating its own NPCs, and a hit or a death one player
+ * caused on one of theirs is relayed to the other games near it, which apply it to their own
+ * NPC of the same record near the same spot. Nothing is decided here - the NPCs are not the
+ * server's - so this only checks the numbers and forwards.
+ */
+void WorldNpcSystem::HandleNpcLinkEvent(PacketEvent<client::NpcLinkEvent>& aMessage) noexcept
+{
+    if (!m_linkEnabled)
+        return;
+
+    auto* pPlayerManager = m_pWorld->get_mut<PlayerManager>();
+    const auto sender = pPlayerManager->GetByConnectionId(aMessage.ConnectionId);
+    if (!sender)
+        return;
+
+    const auto& position = aMessage.get_position();
+    const glm::vec3 at{position.get_x(), position.get_y(), position.get_z()};
+    const float damage = aMessage.get_damage_pct();
+    if (!std::isfinite(at.x) || !std::isfinite(at.y) || !std::isfinite(at.z) || !std::isfinite(damage) ||
+        damage < 0.f || damage > 100.f || aMessage.get_record() == 0)
+        return;
+
+    if (damage == 0.f && !aMessage.get_killed() && !aMessage.get_defeated())
+        return;
+
+    server::NotifyNpcLinkEvent event;
+    event.set_source(sender);
+    event.set_local_id(aMessage.get_local_id());
+    event.set_record(aMessage.get_record());
+    event.set_position(aMessage.get_position());
+    event.set_spawn(aMessage.get_spawn());
+    event.set_damage_pct(damage);
+    event.set_killed(aMessage.get_killed());
+    event.set_defeated(aMessage.get_defeated());
+
+    uint32_t recipients = 0;
+    m_pWorld->each(
+        [&](flecs::entity aPlayer, const PlayerComponent& aPlayerComponent)
+        {
+            if (aPlayer == sender && !m_linkEcho)
+                return;
+
+            const auto* pMovement = aPlayerComponent.Puppet && aPlayerComponent.Puppet.is_alive()
+                                        ? aPlayerComponent.Puppet.get<MovementComponent>()
+                                        : nullptr;
+            if (!pMovement || glm::distance(pMovement->Position, at) > kNpcLinkRange)
+                return;
+
+            GServer->Send(aPlayerComponent.Connection, event);
+            ++recipients;
+        });
+
+    const auto* pSender = sender.get<PlayerComponent>();
+    spdlog::info("[NpcLink] {} {} NPC {:x} (record {:x}){} - sent to {} game(s)", pSender ? pSender->Username : "?",
+                 aMessage.get_killed() ? "killed" : aMessage.get_defeated() ? "knocked out" : "hit",
+                 aMessage.get_local_id(), aMessage.get_record(),
+                 damage > 0.f ? fmt::format(" for {:.1f}%", damage) : std::string{}, recipients);
 }
 
 void WorldNpcSystem::HandleWorldNpcReport(PacketEvent<client::WorldNpcReport>& aMessage) noexcept

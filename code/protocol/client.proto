@@ -550,6 +550,28 @@ message WorldNpcReport {
     repeated WorldNpcState npcs = 2;
 }
 
+/**
+ * Shared NPC combat. Every game keeps simulating its own NPCs; what one player does to one of
+ * theirs is applied by every other game to ITS NPC of the same record near the same spot -
+ * the gangers of a gig spawn at the same points on every machine.
+ */
+message NpcLinkEvent {
+    // The sender's own entity hash for the NPC: their key for it while it stays spawned.
+    uint64 local_id = 1;
+    // TweakDBID of its character record.
+    uint64 record = 2;
+    // Where it stands now, and where the sender first saw it - the spawn point, still the
+    // same on every machine after the fight has moved everybody around.
+    common.Vector3 position = 3;
+    common.Vector3 spawn = 4;
+    // A hit: this share of its maximum health, 0..100. Zero for a death on its own.
+    float damage_pct = 5;
+    // It died in the sender's game.
+    bool killed = 6;
+    // It was knocked out (a non-lethal takedown) in the sender's game.
+    bool defeated = 7;
+}
+
 message Protocol {
     oneof content {
         AuthenticationRequest authentication_request = 1;
@@ -575,5 +597,6 @@ message Protocol {
         CallControlRequest call_control_request = 21;
         LeaveWorldRequest leave_world_request = 22;
         WorldNpcReport world_npc_report = 23;
+        NpcLinkEvent npc_link_event = 24;
     }
 }
