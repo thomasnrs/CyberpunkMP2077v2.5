@@ -613,10 +613,28 @@ void NetworkWorldSystem::HandleWorldState(const PacketEvent<server::NotifyWorldS
     ApplyWorldState();
 }
 
+bool NetworkWorldSystem::IsStoryMode() const
+{
+    const auto service = Core::Container::Get<NetworkService>();
+    return service && service->IsConnected() && service->GetServerSettings().get_story_mode();
+}
+
 void NetworkWorldSystem::ApplyWorldState()
 {
     if (!m_worldState || !m_ready)
         return;
+
+    // Story mode: the quest owns the clock and the sky. Re-asserting the server's every
+    // thirty seconds undid every "later that night" a scene set.
+    if (IsStoryMode())
+    {
+        if (!m_storyClockNoted)
+        {
+            m_storyClockNoted = true;
+            spdlog::info("[WorldState] story mode - the server's clock and weather are not applied");
+        }
+        return;
+    }
 
     m_lastWorldStateApply = std::chrono::steady_clock::now();
 

@@ -103,8 +103,9 @@ protected cb func OnInitialize() -> Bool {
   let network = GameInstance.GetNetworkWorldSystem();
 
   // Only in a launcher session. Somebody's singleplayer game should pause exactly as the
-  // game intends - taking that away outside multiplayer is not ours to do.
-  if IsDefined(network) && network.IsModEnabled() {
+  // game intends - taking that away outside multiplayer is not ours to do. Nor in story
+  // mode, where each game runs its own copy of the story and pausing it holds only that.
+  if IsDefined(network) && network.IsModEnabled() && !network.IsStoryMode() {
     // `this` is a widgetController here, so GetSystemRequestsHandler resolves - which is
     // the whole reason the handler is captured at this point and carried into the callback.
     let unpause = new MpUnpauseBehindMenu();

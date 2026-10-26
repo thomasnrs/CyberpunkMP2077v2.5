@@ -296,7 +296,8 @@ public class MpPhone {
   public static func Active() -> Bool {
     let network = GameInstance.GetNetworkWorldSystem();
 
-    return IsDefined(network) && network.IsConnected();
+    // Story mode keeps every contact: the fixers and friends ARE the story.
+    return IsDefined(network) && network.IsConnected() && !network.IsStoryMode();
   }
 
   /**

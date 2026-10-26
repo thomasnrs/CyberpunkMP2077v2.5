@@ -161,6 +161,17 @@ public func MpSilenceStoryHolocalls(network: ref<NetworkWorldSystem>) -> Void {
     return;
   }
 
+  // Story mode: the holocalls ARE the story - the prologue's are how Jackie, Dex and T-Bug
+  // reach V. Let go of the interlock, which a character connected outside story mode still
+  // carries in their save.
+  if network.IsStoryMode() {
+    if quests.GetFact(n"holo_setup_active") != 0 {
+      quests.SetFact(n"holo_setup_active", 0);
+      network.ScriptLog("[Holocall] story mode - holo_setup_active released, story calls can start again");
+    }
+    return;
+  }
+
   quests.SetFact(n"holo_setup_active", 1);
 
   // Read back rather than trusting the write - the whole point is that this one is load
@@ -180,10 +191,11 @@ public func MpSilenceStoryHolocalls(network: ref<NetworkWorldSystem>) -> Void {
  * the thing being fixed.
  *
  * False when the system is missing, so a failure here leaves the game behaving exactly as
- * it does without the mod.
+ * it does without the mod - and in story mode (config/story.on on the server), where the
+ * quests are the point.
  */
 public static func MpQuestsSilenced() -> Bool {
   let network = GameInstance.GetNetworkWorldSystem();
 
-  return IsDefined(network) && network.IsConnected();
+  return IsDefined(network) && network.IsConnected() && !network.IsStoryMode();
 }

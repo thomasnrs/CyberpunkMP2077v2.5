@@ -239,6 +239,9 @@ public:
     // server will often want the first somewhere with a bit of ceremony and the second
     // beside a ripperdoc. Making one serve both means changing where people respawn every
     // time you move the arrivals point.
+    // config/story.on - see the definition.
+    bool IsStoryMode() const noexcept;
+
     void SetStartPoint(const glm::vec3& acPosition, float aYaw);
     bool GetStartPoint(glm::vec3& aPosition, float& aYaw) const;
 

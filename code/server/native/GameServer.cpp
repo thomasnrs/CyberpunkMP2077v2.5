@@ -345,6 +345,22 @@ bool GameServer::GetRespawnPoint(glm::vec3& aPosition, float& aYaw) const
     return true;
 }
 
+/**
+ * Story mode - playing the campaign together - is on while config/story.on exists.
+ *
+ * The rest of this server was built for roleplay WITHOUT the story: it places characters,
+ * owns their possessions and silences every call a quest makes, and the prologue stalls on
+ * every one of those. In story mode each player's own game and save carry their progress and
+ * belongings, as in singleplayer; the server keeps them in one world with each other.
+ *
+ * Asked per use rather than cached, so it can be switched between joins without a restart.
+ */
+bool GameServer::IsStoryMode() const noexcept
+{
+    std::error_code ec;
+    return std::filesystem::exists(GetPath() / "config" / "story.on", ec);
+}
+
 void GameServer::SetStartPoint(const glm::vec3& acPosition, float aYaw)
 {
     // Caught where the mistake is MADE, not at every spawn afterwards.
@@ -1157,6 +1173,7 @@ void GameServer::AdmitPlayer(const ConnectionId aConnectionId, const std::string
     // for a week. Nobody could see anybody. See the comment on Level::kCellSize.
     settings.set_cell_size(static_cast<uint32_t>(Level::kCellSize));
     settings.set_interest_radius(Level::kLoadRadius);
+    settings.set_story_mode(IsStoryMode());
     response.set_settings(settings);
 
     // Tell them what character this ACCOUNT owns, before they can decide for themselves.

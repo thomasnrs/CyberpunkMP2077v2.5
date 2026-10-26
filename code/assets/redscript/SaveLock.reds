@@ -55,7 +55,12 @@ public class MpSaveLock extends DelayCallback {
     let game = GetGameInstance();
     let network = GameInstance.GetNetworkWorldSystem();
 
-    if IsDefined(network) && network.IsModEnabled() {
+    if IsDefined(network) && network.IsModEnabled() && network.IsStoryMode() {
+      // Story mode: the save IS the character - its quest progress has nowhere else to
+      // live. Saving comes back once the server has said so; until then (the menu, the
+      // creator) the lock holds, as it always has. Still polled, in case the session ends.
+      SaveLocksManager.RequestSaveLockRemove(game, MpSaveLockReason());
+    } else if IsDefined(network) && network.IsModEnabled() {
       SaveLocksManager.RequestSaveLockAdd(game, MpSaveLockReason());
     } else {
       // Not a launcher session any more. Give saving back and stop polling - leaving the

@@ -60,4 +60,5 @@ private:
     bool m_linkEnabled{true};
     bool m_linkEcho{false};
     bool m_switchesRead{false};
+    bool m_story{false};
 };

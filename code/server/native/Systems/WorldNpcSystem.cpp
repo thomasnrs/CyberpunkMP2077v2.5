@@ -59,6 +59,13 @@ void WorldNpcSystem::ReadSwitches() noexcept
                      linkEcho ? ", echoed to the sender (config/npclink.echo)" : "");
     m_linkEnabled = linkEnabled;
     m_linkEcho = linkEcho;
+
+    // Read by GameServer::IsStoryMode at each join; noted here so the log says when it moved.
+    const bool story = GServer && GServer->IsStoryMode();
+    if (story != m_story || !m_switchesRead)
+        spdlog::warn("[Story] story mode {}", story ? "ON (config/story.on) - the campaign plays as in singleplayer"
+                                                    : "OFF - roleplay rules: no story calls, server-owned characters");
+    m_story = story;
     m_switchesRead = true;
 
     if (enabled != m_enabled)

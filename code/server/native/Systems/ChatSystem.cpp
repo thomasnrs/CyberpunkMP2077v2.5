@@ -828,6 +828,16 @@ void ChatSystem::HandleSaveCharacterRequest(const PacketEvent<client::SaveCharac
     // answer different questions. The kit is granted once per CHARACTER: the obvious wrong
     // place for it is the join path, which would hand out a fresh outfit and another
     // 20,000 eddies every time somebody reconnected.
+    //
+    // Story mode: the prologue dresses and arms a lifepath itself, as in singleplayer, and a
+    // kit over it replaces the inventory the quest just handed out. Marked granted anyway, so
+    // switching story mode off later does not strip somebody who has been playing the story.
+    if (GServer->IsStoryMode() && !character.StarterKitGranted)
+    {
+        character.StarterKitGranted = true;
+        spdlog::info("[StarterKit] {} - story mode, no kit: the prologue equips them", pPlayer->Username);
+    }
+
     if (!character.StarterKitGranted)
     {
         const auto lifepath = StarterKit::FromWire(aMessage.get_lifepath());

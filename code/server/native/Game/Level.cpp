@@ -559,7 +559,12 @@ void Level::HandleSpawnCharacterRequest(PacketEvent<client::SpawnCharacterReques
 
     bool placedAtStart = false;
 
-    if (isNewHere && GServer->GetStartPoint(startPosition, startYaw))
+    // Story mode: where V stands is where their save and their quest put them. Moving a
+    // character born into the prologue to the arrivals point - or anyone back to where the
+    // server last saw them - takes them out of the scene the quest is waiting in.
+    const bool storyMode = GServer->IsStoryMode();
+
+    if (isNewHere && !storyMode && GServer->GetStartPoint(startPosition, startYaw))
     {
         placedAtStart = true;
 
@@ -617,8 +622,8 @@ void Level::HandleSpawnCharacterRequest(PacketEvent<client::SpawnCharacterReques
     // Both branches teleport, and this one runs second - so without the guard it would
     // immediately drag a new arrival back to the last position their account happened to
     // have stored, undoing the placement above and leaving no trace of why.
-    const auto* pSaved = placedAtStart ? nullptr
-                                       : GServer->GetPlayerStore().Find(pComponent->DiscordId);
+    const auto* pSaved = placedAtStart || storyMode ? nullptr
+                                                    : GServer->GetPlayerStore().Find(pComponent->DiscordId);
     if (pSaved)
     {
         pos = glm::vec3(pSaved->X, pSaved->Y, pSaved->Z);
@@ -766,7 +771,10 @@ void Level::HandleSpawnCharacterRequest(PacketEvent<client::SpawnCharacterReques
     // created before possessions were stored would empty their pockets on their next
     // login, which is a far worse failure than a character keeping a save's contents for
     // one more session.
-    if (const auto* pCharacter = GServer->GetPlayerStore().FindCharacter(pComponent->DiscordId))
+    //
+    // Not in story mode: there the save is the character - its quest items, its money, its
+    // perks - and a server copy laid over it is how quest items go missing.
+    if (const auto* pCharacter = storyMode ? nullptr : GServer->GetPlayerStore().FindCharacter(pComponent->DiscordId))
     {
         const bool known = !pCharacter->Inventory.empty() || pCharacter->Money > 0;
 
@@ -884,6 +892,14 @@ void Level::HandleSpawnCharacterRequest(PacketEvent<client::SpawnCharacterReques
     // Sent to everybody, not just to characters with stored possessions - an unlocked
     // building is a property of the world rather than of a character, and a new player
     // should walk into the same city as everyone else.
+    //
+    // Not in story mode: a door opened by fact is a step of the story skipped.
+    if (storyMode)
+    {
+        spdlog::info("{} joins in story mode - their save keeps its place, possessions and quest facts",
+                     pComponent->Username);
+    }
+    else
     {
         const auto& facts = GServer->GetWorldFacts().All();
 

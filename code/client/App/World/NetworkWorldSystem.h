@@ -441,6 +441,9 @@ struct NetworkWorldSystem : RED4ext::IGameSystem, Core::HookingAgent, flecs::wor
     // simulating the city's NPCs for everybody, and the report script builds when it is:
     // one ReportWorldNpc per NPC near us, then FlushWorldNpcReport sends them together.
     bool IsWorldHost() const { return m_isWorldHost; }
+
+    // Story mode (server Settings.story_mode): the campaign plays as in singleplayer.
+    bool IsStoryMode() const;
     void ReportWorldNpc(uint64_t aLocalId, uint64_t aRecord, const Red::Vector4& aPosition, float aYaw, float aSpeed,
                         uint32_t aLifeState, uint64_t aWeapon, uint32_t aShots);
     void FlushWorldNpcReport();
@@ -912,6 +915,7 @@ private:
     bool m_downed{false};
     uint32_t m_ownLifeState{0};
     bool m_isWorldHost{false};
+    bool m_storyClockNoted{false};
     Vector<client::WorldNpcState> m_pendingWorldNpcs;
     Vector<std::pair<uint64_t, float>> m_worldNpcDamage;
     float m_consumedWorldNpcDamage{0.f};
@@ -1112,6 +1116,7 @@ RTTI_DEFINE_CLASS(NetworkWorldSystem, {
     RTTI_METHOD(FlushWorldNpcReport);
     RTTI_METHOD(ConsumeWorldNpcDamage);
     RTTI_METHOD(GetConsumedWorldNpcDamage);
+    RTTI_METHOD(IsStoryMode);
     RTTI_METHOD(SendNpcLink);
     RTTI_METHOD(ConsumeNpcLink);
     RTTI_METHOD(GetNpcLinkSource);

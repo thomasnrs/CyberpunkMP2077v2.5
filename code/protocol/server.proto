@@ -10,6 +10,10 @@ message Settings {
     uint32 coordinate_version = 3;
     uint32 cell_size = 4;
     uint32 interest_radius = 5;
+    // Story mode (config/story.on): the campaign plays as in singleplayer - calls, objectives,
+    // slow motion, the game's own clock and saves - and the server stops placing characters
+    // and handing them possessions.
+    bool story_mode = 6;
 }
 
 // Declared BEFORE anything that uses it, and that is load-bearing rather than tidy.

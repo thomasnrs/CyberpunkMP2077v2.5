@@ -118,10 +118,12 @@ private func Apply() -> Void {
  * Returns false when the system is missing, so a failure here leaves the game behaving
  * exactly as it does without the mod.
  */
+// Not in story mode: each player's game runs their own copy of the story, and its scenes,
+// tutorials and Kerenzikov slow time down - or skip it - as they do in singleplayer.
 public static func MpTimeDilationBlocked() -> Bool {
   let network = GameInstance.GetNetworkWorldSystem();
 
-  return IsDefined(network) && network.IsConnected();
+  return IsDefined(network) && network.IsConnected() && !network.IsStoryMode();
 }
 
 // ---------------------------------------------------------------------------

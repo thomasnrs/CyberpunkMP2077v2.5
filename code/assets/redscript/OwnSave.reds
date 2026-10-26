@@ -106,6 +106,12 @@ protected cb func MpOnSavesReady(saves: array<String>) -> Bool {
     let chosen = -1;
     let i = 0;
 
+    // Story mode: the player's OWN newest save - their place in the campaign lives there and
+    // nowhere else. "Newest" is the coin flip described above, but in story mode it is the
+    // right one: each player plays one story character on their own machine, and every
+    // session saves it as they go.
+    let storyMode = IsDefined(network) && network.IsStoryMode();
+
     // Newest first, so the FIRST template entry is the current one. Matching by name rather
     // than by position is the entire point: position is what made this a coin flip.
     while i < ArraySize(saves) {
@@ -113,11 +119,18 @@ protected cb func MpOnSavesReady(saves: array<String>) -> Bool {
             network.ScriptLog(s"[OwnSave]   save[\(i)] = '\(saves[i])'");
         }
 
-        if chosen < 0 && StrContains(saves[i], template) {
+        let isTemplate = StrContains(saves[i], template);
+        if chosen < 0 && ((storyMode && !isTemplate) || (!storyMode && isTemplate)) {
             chosen = i;
         }
 
         i += 1;
+    }
+
+    if storyMode && chosen >= 0 {
+        network.ScriptLog(s"[OwnSave] story mode - loading the newest own save '\(saves[chosen])' at index \(chosen)");
+        this.LoadModdedSave(chosen);
+        return false;
     }
 
     if chosen < 0 {
